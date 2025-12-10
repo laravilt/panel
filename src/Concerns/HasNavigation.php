@@ -62,14 +62,31 @@ trait HasNavigation
      */
     public function getUserMenu(): array
     {
+        $menuItems = [];
+
         if ($this->userMenuCallback) {
             $menu = new UserMenu;
             call_user_func($this->userMenuCallback, $menu);
-
-            return $menu->toArray();
+            $menuItems = $menu->toArray();
+        } else {
+            $menuItems = UserMenu::default()->toArray();
         }
 
-        return UserMenu::default()->toArray();
+        // Add AI menu items if AI is configured
+        if (method_exists($this, 'getAIMenuItems')) {
+            $aiItems = $this->getAIMenuItems();
+            if (! empty($aiItems)) {
+                $aiMenuItems = collect($aiItems)->map(fn ($item) => $item->toArray())->all();
+                // Insert AI items before the last item (logout)
+                if (count($menuItems) > 0) {
+                    array_splice($menuItems, -1, 0, $aiMenuItems);
+                } else {
+                    $menuItems = array_merge($menuItems, $aiMenuItems);
+                }
+            }
+        }
+
+        return $menuItems;
     }
 
     /**

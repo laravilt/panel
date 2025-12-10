@@ -38,6 +38,7 @@ class HandleLocalization
         'laravilt-support::support', // Support package
         'laravilt-forms::fields',    // Forms package
         'laravilt-schemas::schemas', // Schemas package
+        'laravilt-ai::ai',           // AI package
         'tables::tables',            // Tables package
         'actions::actions',          // Actions package
         'notifications::notifications', // Notifications package

@@ -9,20 +9,20 @@ class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
-
-        // Additional setup if needed
     }
 
     protected function getPackageProviders($app): array
     {
         return [
+            \Laravilt\Support\SupportServiceProvider::class,
             \Laravilt\Panel\PanelServiceProvider::class,
         ];
     }
 
     protected function getEnvironmentSetUp($app): void
     {
-        // Setup environment for testing
-        config()->set('database.default', 'testing');
+        config()->set('database.default', 'sqlite');
+        config()->set('database.connections.sqlite.database', ':memory:');
+        config()->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
     }
 }

@@ -5,6 +5,7 @@ namespace Laravilt\Panel;
 use Closure;
 use Illuminate\Support\Traits\Conditionable;
 use Illuminate\Support\Traits\Macroable;
+use Laravilt\Panel\Concerns\HasAI;
 use Laravilt\Panel\Concerns\HasAuth;
 use Laravilt\Panel\Concerns\HasBranding;
 use Laravilt\Panel\Concerns\HasClusters;
@@ -24,6 +25,7 @@ use Laravilt\Panel\Discovery\PanelDiscovery;
 class Panel
 {
     use Conditionable;
+    use HasAI;
     use HasAuth;
     use HasBranding;
     use HasClusters;
@@ -149,7 +151,23 @@ class Panel
             }
         }
 
-        return $menu->toArray();
+        $menuItems = $menu->toArray();
+
+        // Add AI menu items if AI providers are configured
+        if ($this->hasAIProviders()) {
+            $aiItems = $this->getAIMenuItems();
+            if (! empty($aiItems)) {
+                $aiMenuItems = collect($aiItems)->map(fn ($item) => $item->toArray())->all();
+                // Insert AI items before the last item (logout)
+                if (count($menuItems) > 0) {
+                    array_splice($menuItems, -1, 0, $aiMenuItems);
+                } else {
+                    $menuItems = array_merge($menuItems, $aiMenuItems);
+                }
+            }
+        }
+
+        return $menuItems;
     }
 
     /**
@@ -219,6 +237,8 @@ class Panel
         $this->bootNavigation();
         $this->registerAuthRoutes();
         $this->registerNotificationRoutes();
+        $this->registerAIRoutes();
+        $this->registerResourcesForGlobalSearch();
     }
 
     /**

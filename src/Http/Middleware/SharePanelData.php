@@ -46,6 +46,13 @@ class SharePanelData
                     'currentLocale' => $request->user()?->locale ?? config('app.locale', 'en'),
                     'font' => $panel->getFontData(),
                     'hasDarkMode' => $panel->hasDarkMode(),
+                    // Global search config
+                    'hasGlobalSearch' => $panel->hasGlobalSearch(),
+                    'globalSearchEndpoint' => $panel->hasGlobalSearch() ? $panel->getGlobalSearchEndpoint() : null,
+                    'globalSearchConfig' => $panel->getGlobalSearchConfig(),
+                    // AI config
+                    'hasAI' => $panel->hasAIProviders(),
+                    'aiConfig' => $panel->getAIConfig(),
                 ],
                 'notifications' => fn () => $this->getNotifications($request),
                 'databaseNotifications' => fn () => $this->getDatabaseNotifications($request),
