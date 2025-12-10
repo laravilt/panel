@@ -1,6 +1,6 @@
 ![Panel](./arts/screenshot.jpg)
 
-# Panel Plugin for Laravilt
+# Laravilt Panel
 
 [![Latest Stable Version](https://poser.pugx.org/laravilt/panel/version.svg)](https://packagist.org/packages/laravilt/panel)
 [![License](https://poser.pugx.org/laravilt/panel/license.svg)](https://packagist.org/packages/laravilt/panel)
