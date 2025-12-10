@@ -57,20 +57,6 @@
         "test-coverage": "vendor/bin/pest --coverage",
         "format": "vendor/bin/pint"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../support"
-        },
-        {
-            "type": "path",
-            "url": "../actions"
-        },
-        {
-            "type": "path",
-            "url": "../forms"
-        }
-    ],
     "config": {
         "sort-packages": true,
         "allow-plugins": {

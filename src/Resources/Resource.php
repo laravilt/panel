@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Resources;
 
 use Illuminate\Database\Eloquent\Model;
+use Laravilt\AI\AIAgent;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\ApiResource;
 use Laravilt\Tables\Table;
@@ -37,6 +38,8 @@ abstract class Resource
     protected static bool $hasApi = false;
 
     protected static bool $hasFlutter = false;
+
+    protected static bool $hasAI = false;
 
     /**
      * Whether to show this resource's stats on the dashboard.
@@ -112,6 +115,58 @@ abstract class Resource
         }
 
         return static::api(static::makeApiResource());
+    }
+
+    /**
+     * Create a new AIAgent instance for configuration.
+     */
+    public static function makeAIAgent(): AIAgent
+    {
+        return AIAgent::make()
+            ->name(static::getSlug())
+            ->model(static::$model)
+            ->description('AI agent for '.static::getLabel().' resource');
+    }
+
+    /**
+     * Configure the AI agent for this resource.
+     * Override this method in your resource to customize the AI configuration.
+     */
+    public static function ai(AIAgent $agent): AIAgent
+    {
+        return $agent;
+    }
+
+    /**
+     * Get the configured AI agent.
+     */
+    public static function getAIAgent(): ?AIAgent
+    {
+        if (! static::hasAI()) {
+            return null;
+        }
+
+        return static::ai(static::makeAIAgent());
+    }
+
+    /**
+     * Check if this resource has AI capabilities.
+     */
+    public static function hasAI(): bool
+    {
+        // Auto-detect: if ai() method is defined in child class (not just inherited), enable AI
+        if (static::$hasAI) {
+            return true;
+        }
+
+        // Check if ai() method is overridden in the child class
+        try {
+            $reflection = new \ReflectionMethod(static::class, 'ai');
+
+            return $reflection->getDeclaringClass()->getName() === static::class;
+        } catch (\ReflectionException $e) {
+            return false;
+        }
     }
 
     public static function flutter(\Laravilt\Flutter\Flutter $flutter): \Laravilt\Flutter\Flutter
@@ -353,8 +408,10 @@ abstract class Resource
             'relations' => static::getRelations(),
             'hasApi' => static::hasApi(),
             'hasFlutter' => static::hasFlutter(),
+            'hasAI' => static::hasAI(),
             'apiRoutes' => static::getApiRoutes(),
             'apiResource' => static::getApiResource()?->toInertiaProps(),
+            'aiAgent' => static::getAIAgent()?->toArray(),
         ];
     }
 }
