@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Laravilt\Panel\Pages;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravilt\Actions\Action;
@@ -152,8 +151,8 @@ abstract class ManageRecords extends ListRecords
 
         return \Laravilt\Actions\CreateAction::make()
             ->stableId("{$slug}_create")
-            ->label(__('actions::actions.buttons.create') . ' ' . $this->getResourceLabel())
-            ->modalHeading(__('actions::actions.buttons.create') . ' ' . $this->getResourceLabel())
+            ->label(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
+            ->modalHeading(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
             ->model($modelClass)
             ->formSchema($formSchema)
             ->using();
@@ -184,7 +183,7 @@ abstract class ManageRecords extends ListRecords
                 ->color('secondary')
                 ->tooltip(__('actions::actions.tooltips.view'))
                 ->modal(true)
-                ->modalHeading(__('actions::actions.buttons.view') . ' ' . $this->getResourceLabel())
+                ->modalHeading(__('actions::actions.buttons.view').' '.$this->getResourceLabel())
                 ->modalInfolistSchema($infolistSchema['schema'] ?? [])
                 ->modalSubmitActionLabel(null)
                 ->modalCancelActionLabel(__('actions::actions.buttons.close'))
@@ -200,7 +199,7 @@ abstract class ManageRecords extends ListRecords
                 ->color('warning')
                 ->tooltip(__('actions::actions.tooltips.edit'))
                 ->modal(true)
-                ->modalHeading(__('actions::actions.buttons.edit') . ' ' . $this->getResourceLabel())
+                ->modalHeading(__('actions::actions.buttons.edit').' '.$this->getResourceLabel())
                 ->modalFormSchema($formSchema)
                 ->modalSubmitActionLabel(__('actions::actions.buttons.save'))
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
@@ -239,7 +238,7 @@ abstract class ManageRecords extends ListRecords
                 ->color('destructive')
                 ->tooltip(__('actions::actions.tooltips.delete'))
                 ->requiresConfirmation(true)
-                ->modalHeading(__('actions::actions.buttons.delete') . ' ' . $this->getResourceLabel())
+                ->modalHeading(__('actions::actions.buttons.delete').' '.$this->getResourceLabel())
                 ->modalDescription(__('actions::actions.confirm_delete_description'))
                 ->modalSubmitActionLabel(__('actions::actions.buttons.confirm'))
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
@@ -298,7 +297,7 @@ abstract class ManageRecords extends ListRecords
         $resource = static::getResource();
 
         // Configure the table
-        $table = new Table();
+        $table = new Table;
         $table = $resource::table($table);
         $table->query(fn () => $this->getTableQuery());
         $table->model($resource::getModel());
@@ -329,7 +328,7 @@ abstract class ManageRecords extends ListRecords
         $resource = static::getResource();
 
         // Configure the table with modal CRUD actions
-        $table = new Table();
+        $table = new Table;
         $table = $resource::table($table);
         $table->query(fn () => $this->getTableQuery());
         $table->model($resource::getModel());
@@ -362,7 +361,7 @@ abstract class ManageRecords extends ListRecords
 
         try {
             $data = $request->all();
-            $record = new $modelClass();
+            $record = new $modelClass;
             $record->fill($data);
             $record->save();
 

@@ -2,7 +2,6 @@
 
 namespace Laravilt\Panel\Discovery;
 
-use Illuminate\Support\Facades\File;
 use Laravilt\Panel\Panel;
 
 class PanelDiscovery

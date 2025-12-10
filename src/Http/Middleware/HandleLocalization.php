@@ -5,7 +5,6 @@ namespace Laravilt\Panel\Http\Middleware;
 use Closure;
 use DateTimeZone;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Inertia\Inertia;

@@ -7,7 +7,6 @@ namespace Laravilt\Panel\Resources\RelationManagers;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravilt\Actions\Action;
-use Laravilt\Actions\CreateAction;
 use Laravilt\Infolists\Infolist;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\Table;
@@ -110,18 +109,18 @@ abstract class RelationManager
     {
         $actions = [];
 
-        if ($this->canCreate() && !$this->isReadOnly()) {
+        if ($this->canCreate() && ! $this->isReadOnly()) {
             $formSchema = $this->form(Schema::make())->getSchema();
 
             // Build the relation URL for creating records
             // This will be overridden by the frontend with the correct panel/resource/record context
             $createAction = Action::make('create')
-                ->label(__('actions::actions.buttons.create') . ' ' . static::getLabel())
+                ->label(__('actions::actions.buttons.create').' '.static::getLabel())
                 ->icon('Plus')
                 ->color('primary')
                 ->method('POST')
                 ->requiresConfirmation(true)
-                ->modalHeading(__('actions::actions.buttons.create') . ' ' . static::getLabel())
+                ->modalHeading(__('actions::actions.buttons.create').' '.static::getLabel())
                 ->modalFormSchema($formSchema)
                 ->modalSubmitActionLabel(__('actions::actions.buttons.create'))
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))

@@ -6,10 +6,8 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
-use function Laravel\Prompts\search;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
-use function Laravel\Prompts\confirm;
 
 class MakeRelationManagerCommand extends Command
 {
@@ -24,12 +22,13 @@ class MakeRelationManagerCommand extends Command
 
         if (empty($panels)) {
             $this->components->error('No panels found. Please create a panel first.');
+
             return self::FAILURE;
         }
 
         // Get panel name
         $panel = $this->argument('panel');
-        if (!$panel) {
+        if (! $panel) {
             $panel = select(
                 label: 'Select a panel:',
                 options: $panels,
@@ -43,12 +42,13 @@ class MakeRelationManagerCommand extends Command
 
         if (empty($resources)) {
             $this->components->error("No resources found in panel [{$panel}]. Please create a resource first.");
+
             return self::FAILURE;
         }
 
         // Get resource name
         $resource = $this->argument('resource');
-        if (!$resource) {
+        if (! $resource) {
             $resource = select(
                 label: 'Select a resource:',
                 options: $resources,
@@ -60,8 +60,9 @@ class MakeRelationManagerCommand extends Command
         // Get the model class from resource
         $modelClass = $this->getModelFromResource($panel, $resource);
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             $this->components->error("Could not determine model class for resource [{$resource}].");
+
             return self::FAILURE;
         }
 
@@ -77,7 +78,7 @@ class MakeRelationManagerCommand extends Command
             );
         } else {
             $relationship = $this->argument('relationship');
-            if (!$relationship) {
+            if (! $relationship) {
                 $relationship = select(
                     label: 'Select a relationship:',
                     options: array_combine($relationships, $relationships),
@@ -87,7 +88,7 @@ class MakeRelationManagerCommand extends Command
         }
 
         $relationship = Str::camel($relationship);
-        $relationManagerName = Str::studly($relationship) . 'RelationManager';
+        $relationManagerName = Str::studly($relationship).'RelationManager';
 
         // Get the related model
         $relatedModel = $this->getRelatedModel($modelClass, $relationship);
@@ -119,16 +120,16 @@ class MakeRelationManagerCommand extends Command
         $this->newLine();
         $this->components->info("Relation Manager [{$relationManagerName}] created successfully!");
         $this->newLine();
-        $this->components->info("File created:");
+        $this->components->info('File created:');
         $this->line("  app/Laravilt/{$panel}/Resources/{$resource}/RelationManagers/{$relationManagerName}.php");
         $this->newLine();
         $this->components->info("Don't forget to register the relation manager in your resource:");
-        $this->line("  public static function getRelations(): array");
-        $this->line("  {");
-        $this->line("      return [");
+        $this->line('  public static function getRelations(): array');
+        $this->line('  {');
+        $this->line('      return [');
         $this->line("          {$relationManagerName}::class,");
-        $this->line("      ];");
-        $this->line("  }");
+        $this->line('      ];');
+        $this->line('  }');
 
         return self::SUCCESS;
     }
@@ -137,7 +138,7 @@ class MakeRelationManagerCommand extends Command
     {
         $laraviltPath = app_path('Laravilt');
 
-        if (!File::isDirectory($laraviltPath)) {
+        if (! File::isDirectory($laraviltPath)) {
             return [];
         }
 
@@ -153,7 +154,7 @@ class MakeRelationManagerCommand extends Command
     {
         $resourcesPath = app_path("Laravilt/{$panel}/Resources");
 
-        if (!File::isDirectory($resourcesPath)) {
+        if (! File::isDirectory($resourcesPath)) {
             return [];
         }
 
@@ -169,7 +170,7 @@ class MakeRelationManagerCommand extends Command
     {
         $resourcePath = app_path("Laravilt/{$panel}/Resources/{$resource}/{$resource}Resource.php");
 
-        if (!File::exists($resourcePath)) {
+        if (! File::exists($resourcePath)) {
             return null;
         }
 
@@ -180,11 +181,12 @@ class MakeRelationManagerCommand extends Command
             $modelClass = trim($matches[1]);
 
             // Check if it's a full namespace or just a class name
-            if (!str_contains($modelClass, '\\')) {
+            if (! str_contains($modelClass, '\\')) {
                 // Try to find the use statement
-                if (preg_match('/use\s+([^;]+\\\\' . preg_quote($modelClass) . ')\s*;/', $content, $useMatch)) {
+                if (preg_match('/use\s+([^;]+\\\\'.preg_quote($modelClass).')\s*;/', $content, $useMatch)) {
                     return $useMatch[1];
                 }
+
                 // Default to App\Models namespace
                 return "App\\Models\\{$modelClass}";
             }
@@ -197,7 +199,7 @@ class MakeRelationManagerCommand extends Command
 
     protected function getModelRelationships(string $modelClass): array
     {
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return [];
         }
 
@@ -210,7 +212,7 @@ class MakeRelationManagerCommand extends Command
             }
 
             $returnType = $method->getReturnType();
-            if (!$returnType) {
+            if (! $returnType) {
                 continue;
             }
 
@@ -232,14 +234,15 @@ class MakeRelationManagerCommand extends Command
 
     protected function getRelatedModel(string $modelClass, string $relationship): ?string
     {
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return null;
         }
 
         try {
-            $model = new $modelClass();
+            $model = new $modelClass;
             if (method_exists($model, $relationship)) {
                 $relation = $model->{$relationship}();
+
                 return get_class($relation->getRelated());
             }
         } catch (\Exception $e) {
@@ -251,11 +254,11 @@ class MakeRelationManagerCommand extends Command
 
     protected function guessRecordTitleAttribute(?string $modelClass): string
     {
-        if (!$modelClass || !class_exists($modelClass)) {
+        if (! $modelClass || ! class_exists($modelClass)) {
             return 'name';
         }
 
-        $model = new $modelClass();
+        $model = new $modelClass;
         $fillable = $model->getFillable();
 
         $candidates = ['name', 'title', 'label', 'subject', 'heading', 'email'];

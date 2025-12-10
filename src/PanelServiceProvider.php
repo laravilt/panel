@@ -98,11 +98,11 @@ class PanelServiceProvider extends ServiceProvider
                 $authMiddleware = $panel->getAuthMiddleware();
 
                 // Replace 'auth' with 'panel.auth' to use panel's custom Authenticate middleware
-                $middleware = array_map(fn($m) => $m === 'auth' ? 'panel.auth' : $m, $middleware);
-                $authMiddleware = array_map(fn($m) => $m === 'auth' ? 'panel.auth' : $m, $authMiddleware);
+                $middleware = array_map(fn ($m) => $m === 'auth' ? 'panel.auth' : $m, $middleware);
+                $authMiddleware = array_map(fn ($m) => $m === 'auth' ? 'panel.auth' : $m, $authMiddleware);
 
                 // Remove panel.auth from middleware array to ensure correct order
-                $middlewareWithoutAuth = array_filter($middleware, fn($m) => $m !== 'panel.auth');
+                $middlewareWithoutAuth = array_filter($middleware, fn ($m) => $m !== 'panel.auth');
 
                 Route::middleware(array_merge(
                     $middlewareWithoutAuth,
@@ -207,9 +207,11 @@ class PanelServiceProvider extends ServiceProvider
             foreach ($pages as $pageConfig) {
                 if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                     $page = app($pageConfig['class']);
+
                     return $page->index(request());
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.data');
 
@@ -219,23 +221,27 @@ class PanelServiceProvider extends ServiceProvider
             foreach ($pages as $pageConfig) {
                 if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                     $page = app($pageConfig['class']);
+
                     return $page->store(request());
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.store');
 
         // GET /{slug}/{id} - Get single record for view/edit modal
         Route::get($slug.'/{id}', function ($id) use ($resourceClass) {
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 $pages = $resourceClass::getPages();
                 foreach ($pages as $pageConfig) {
                     if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                         $page = app($pageConfig['class']);
+
                         return $page->show(request(), $id);
                     }
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.show');
 
@@ -245,9 +251,11 @@ class PanelServiceProvider extends ServiceProvider
             foreach ($pages as $pageConfig) {
                 if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                     $page = app($pageConfig['class']);
+
                     return $page->update(request(), $id);
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.update');
 
@@ -257,9 +265,11 @@ class PanelServiceProvider extends ServiceProvider
             foreach ($pages as $pageConfig) {
                 if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                     $page = app($pageConfig['class']);
+
                     return $page->destroy(request(), $id);
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.destroy');
 
@@ -269,9 +279,11 @@ class PanelServiceProvider extends ServiceProvider
             foreach ($pages as $pageConfig) {
                 if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
                     $page = app($pageConfig['class']);
+
                     return $page->bulkDelete(request());
                 }
             }
+
             return response()->json(['error' => 'Page not found'], 404);
         })->name('resources.'.$slug.'.bulk-delete');
     }
@@ -292,7 +304,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Get the table configuration to find the column and its callbacks
-            $table = new \Laravilt\Tables\Table();
+            $table = new \Laravilt\Tables\Table;
             $table = $resourceClass::table($table);
             $columns = $table->getColumns();
 
@@ -306,7 +318,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Check if column exists and is editable
-            if (!$columnConfig) {
+            if (! $columnConfig) {
                 return back()->withErrors([$column => 'Column not found.']);
             }
 
@@ -359,7 +371,7 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 return response()->json(['error' => 'Relation manager not found'], 404);
             }
 
@@ -409,10 +421,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'Relation manager not found'], 404);
                 }
+
                 return back()->withErrors(['error' => 'Relation manager not found']);
             }
 
@@ -427,7 +440,7 @@ class PanelServiceProvider extends ServiceProvider
                 ->send();
 
             // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 return response()->json([
                     'success' => true,
                     'data' => $newRecord,
@@ -452,10 +465,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'Relation manager not found'], 404);
                 }
+
                 return back()->withErrors(['error' => 'Relation manager not found']);
             }
 
@@ -470,7 +484,7 @@ class PanelServiceProvider extends ServiceProvider
                 ->send();
 
             // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 return response()->json([
                     'success' => true,
                     'data' => $relatedRecord,
@@ -495,10 +509,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'Relation manager not found'], 404);
                 }
+
                 return back()->withErrors(['error' => 'Relation manager not found']);
             }
 
@@ -513,7 +528,7 @@ class PanelServiceProvider extends ServiceProvider
                 ->send();
 
             // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 return response()->json([
                     'success' => true,
                 ]);
@@ -537,10 +552,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'Relation manager not found'], 404);
                 }
+
                 return back()->withErrors(['error' => 'Relation manager not found']);
             }
 
@@ -550,6 +566,7 @@ class PanelServiceProvider extends ServiceProvider
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'No records selected'], 400);
                 }
+
                 return back()->withErrors(['error' => 'No records selected']);
             }
 
@@ -563,7 +580,7 @@ class PanelServiceProvider extends ServiceProvider
                 ->send();
 
             // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 return response()->json([
                     'success' => true,
                     'deleted_count' => $deletedCount,
@@ -588,10 +605,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
             }
 
-            if (!$relationManagerClass) {
+            if (! $relationManagerClass) {
                 if (request()->wantsJson()) {
                     return response()->json(['error' => 'Relation manager not found'], 404);
                 }
+
                 return back()->withErrors(['error' => 'Relation manager not found']);
             }
 
@@ -605,7 +623,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && !request()->header('X-Inertia')) {
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
                 return response()->json([
                     'success' => true,
                     'data' => $relatedRecord,
@@ -685,7 +703,7 @@ class PanelServiceProvider extends ServiceProvider
                 if ($sort = request('sort')) {
                     $direction = request('direction', 'asc');
                     // Validate sort direction
-                    if (!in_array($direction, ['asc', 'desc'])) {
+                    if (! in_array($direction, ['asc', 'desc'])) {
                         $direction = 'asc';
                     }
                     $query->orderBy($sort, $direction);
@@ -830,7 +848,7 @@ class PanelServiceProvider extends ServiceProvider
 
         // Destroy - DELETE /api/{resource}/{id}
         if ($isEnabled('delete')) {
-            Route::middleware($getMiddleware('delete'))->delete($apiPrefix.'/{id}', function ($id) use ($resourceClass, $modelClass) {
+            Route::middleware($getMiddleware('delete'))->delete($apiPrefix.'/{id}', function ($id) use ($modelClass) {
                 $record = $modelClass::findOrFail($id);
                 $record->delete();
 
@@ -842,7 +860,7 @@ class PanelServiceProvider extends ServiceProvider
 
         // Bulk Delete - DELETE /api/{resource}
         if ($isEnabled('bulkDelete')) {
-            Route::middleware($getMiddleware('bulkDelete'))->delete($apiPrefix, function () use ($resourceClass, $modelClass) {
+            Route::middleware($getMiddleware('bulkDelete'))->delete($apiPrefix, function () use ($modelClass) {
                 $ids = request()->input('ids', []);
 
                 if (empty($ids)) {

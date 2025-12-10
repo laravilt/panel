@@ -44,20 +44,20 @@ abstract class EditRecord extends Page
         // Extract the record ID from parameters (first parameter after request)
         $recordId = $parameters[0] ?? null;
 
-        if (!$recordId) {
+        if (! $recordId) {
             throw new \InvalidArgumentException('Record ID parameter is required for EditRecord pages');
         }
 
         // Get the model class from the resource
         $resource = static::getResource();
 
-        if (!$resource) {
+        if (! $resource) {
             throw new \InvalidArgumentException('Resource is not set for '.static::class);
         }
 
         $modelClass = $resource::getModel();
 
-        if (!$modelClass) {
+        if (! $modelClass) {
             throw new \InvalidArgumentException('Model class is not set for resource '.$resource);
         }
 
@@ -255,6 +255,7 @@ abstract class EditRecord extends Page
      * Validate form data using schema validation rules.
      *
      * @param  array<string, mixed>  $data
+     *
      * @throws \Illuminate\Validation\ValidationException
      */
     protected function validateFormData(array $data): array
@@ -276,8 +277,8 @@ abstract class EditRecord extends Page
         foreach ($prefixes as $fieldName => $prefix) {
             if (isset($dataForValidation[$fieldName]) && is_string($dataForValidation[$fieldName]) && $dataForValidation[$fieldName] !== '') {
                 // Only prepend if value doesn't already start with the prefix
-                if (!str_starts_with($dataForValidation[$fieldName], $prefix)) {
-                    $dataForValidation[$fieldName] = $prefix . $dataForValidation[$fieldName];
+                if (! str_starts_with($dataForValidation[$fieldName], $prefix)) {
+                    $dataForValidation[$fieldName] = $prefix.$dataForValidation[$fieldName];
                 }
             }
         }
@@ -356,7 +357,7 @@ abstract class EditRecord extends Page
     {
         $resource = static::getResource();
 
-        if (!$resource || !isset($this->record)) {
+        if (! $resource || ! isset($this->record)) {
             return [];
         }
 

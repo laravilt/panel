@@ -391,7 +391,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      */
     protected function getActionUrl(): string
     {
-        return "/actions/execute";
+        return '/actions/execute';
     }
 
     /**
@@ -582,5 +582,4 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
     {
         //
     }
-
 }

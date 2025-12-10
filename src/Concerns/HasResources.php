@@ -63,6 +63,7 @@ trait HasResources
                             return false;
                         }
                     }
+
                     return true;
                 })
                 ->map(function (SplFileInfo $file) use ($config) {

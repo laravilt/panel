@@ -44,7 +44,7 @@ abstract class ViewRecord extends Page
         // Extract the record ID from parameters (first parameter after request)
         $recordId = $parameters[0] ?? null;
 
-        if (!$recordId) {
+        if (! $recordId) {
             throw new \InvalidArgumentException('Record ID parameter is required for ViewRecord pages');
         }
 
@@ -98,7 +98,7 @@ abstract class ViewRecord extends Page
     {
         $resource = static::getResource();
 
-        if (!$resource || !isset($this->record)) {
+        if (! $resource || ! isset($this->record)) {
             return [];
         }
 

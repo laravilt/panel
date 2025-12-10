@@ -167,7 +167,7 @@ class GetResourceInfoTool extends Tool
             $output .= "• {$keyword} → {$icon}\n";
             $count++;
             if ($count >= 15) {
-                $output .= "• ... and ".count($this->iconMappings) - 15 ." more\n";
+                $output .= '• ... and '.count($this->iconMappings) - 15 ." more\n";
                 break;
             }
         }

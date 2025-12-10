@@ -137,6 +137,7 @@ abstract class CreateRecord extends Page
      * Validate form data using schema validation rules.
      *
      * @param  array<string, mixed>  $data
+     *
      * @throws \Illuminate\Validation\ValidationException
      */
     protected function validateFormData(array $data): array
@@ -158,8 +159,8 @@ abstract class CreateRecord extends Page
         foreach ($prefixes as $fieldName => $prefix) {
             if (isset($dataForValidation[$fieldName]) && is_string($dataForValidation[$fieldName]) && $dataForValidation[$fieldName] !== '') {
                 // Only prepend if value doesn't already start with the prefix
-                if (!str_starts_with($dataForValidation[$fieldName], $prefix)) {
-                    $dataForValidation[$fieldName] = $prefix . $dataForValidation[$fieldName];
+                if (! str_starts_with($dataForValidation[$fieldName], $prefix)) {
+                    $dataForValidation[$fieldName] = $prefix.$dataForValidation[$fieldName];
                 }
             }
         }

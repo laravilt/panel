@@ -274,13 +274,13 @@ abstract class Resource
             $panelId = $panel?->getId();
 
             // If no current panel, try to get the default panel
-            if (!$panelId) {
+            if (! $panelId) {
                 $defaultPanel = $registry->getDefault();
                 $panelId = $defaultPanel?->getId();
             }
 
             // Last resort: get the first registered panel
-            if (!$panelId) {
+            if (! $panelId) {
                 $allPanels = $registry->all();
                 $firstPanel = reset($allPanels);
                 $panelId = $firstPanel ? $firstPanel->getId() : 'admin';

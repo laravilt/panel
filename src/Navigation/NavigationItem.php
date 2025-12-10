@@ -23,7 +23,7 @@ class NavigationItem implements Arrayable
 
     protected string|Closure|null $method = null;
 
-    protected string|null $translationKey = null;
+    protected ?string $translationKey = null;
 
     /**
      * Make a new navigation item.

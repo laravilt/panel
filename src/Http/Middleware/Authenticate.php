@@ -58,6 +58,7 @@ class Authenticate extends Middleware
             if ($panelPath === $segments[0]) {
                 // Set as current panel
                 $registry->setCurrent($panel->getId());
+
                 return $panel;
             }
         }

@@ -94,5 +94,4 @@ class MakePageCommand extends GeneratorCommand
 
         $this->components->info("Vue view created: {$viewFile}");
     }
-
 }

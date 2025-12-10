@@ -5,13 +5,12 @@ namespace Laravilt\Panel\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
-use function Laravel\Prompts\search;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\search;
+use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
 class MakeResourceCommand extends Command
@@ -269,9 +268,13 @@ class MakeResourceCommand extends Command
 
     // Generator options
     protected bool $generateApi = false;
+
     protected bool $isSimple = false;
+
     protected array $apiMethods = [];
+
     protected array $relations = [];
+
     protected bool $useApiTester = false;
 
     /**
@@ -449,12 +452,13 @@ class MakeResourceCommand extends Command
 
         if (empty($panels)) {
             $this->components->error('No panels found. Please create a panel first.');
+
             return self::FAILURE;
         }
 
         // Get panel name
         $panel = $this->argument('panel');
-        if (!$panel) {
+        if (! $panel) {
             $panel = select(
                 label: 'Select a panel:',
                 options: $panels,
@@ -468,12 +472,13 @@ class MakeResourceCommand extends Command
 
         if (empty($tables)) {
             $this->components->error('No tables found in the database.');
+
             return self::FAILURE;
         }
 
         // Let user select a table
         $tableName = $this->option('table');
-        if (!$tableName) {
+        if (! $tableName) {
             $tableName = search(
                 label: 'Select a database table to generate resource from:',
                 options: fn (string $value) => strlen($value) > 0
@@ -484,8 +489,9 @@ class MakeResourceCommand extends Command
             );
         }
 
-        if (!in_array($tableName, $tables)) {
+        if (! in_array($tableName, $tables)) {
             $this->components->error("Table '{$tableName}' not found in database.");
+
             return self::FAILURE;
         }
 
@@ -497,6 +503,7 @@ class MakeResourceCommand extends Command
 
         if (empty($columns)) {
             $this->components->error("No columns found in table '{$tableName}'.");
+
             return self::FAILURE;
         }
 
@@ -508,20 +515,20 @@ class MakeResourceCommand extends Command
         $this->newLine();
 
         // Display columns info
-        $this->components->info("Found " . count($columns) . " columns:");
+        $this->components->info('Found '.count($columns).' columns:');
         foreach ($columns as $column) {
             $relationInfo = '';
             if (isset($this->relations[$column['name']])) {
                 $rel = $this->relations[$column['name']];
                 $relationInfo = " -> BelongsTo {$rel['model']}";
             }
-            $this->line("  - {$column['name']} ({$column['type']}" . ($column['nullable'] ? ', nullable' : '') . "){$relationInfo}");
+            $this->line("  - {$column['name']} ({$column['type']}".($column['nullable'] ? ', nullable' : '')."){$relationInfo}");
         }
         $this->newLine();
 
         // Display detected relations
-        if (!empty($this->relations)) {
-            $this->components->info("Detected " . count($this->relations) . " relations:");
+        if (! empty($this->relations)) {
+            $this->components->info('Detected '.count($this->relations).' relations:');
             foreach ($this->relations as $column => $relation) {
                 $this->line("  - {$column} -> {$relation['model']} (via {$relation['table']})");
             }
@@ -565,23 +572,24 @@ class MakeResourceCommand extends Command
 
         // Confirm generation
         $this->newLine();
-        $this->components->info("Will generate:");
-        $this->line("  - Resource, Form, Table, InfoList");
+        $this->components->info('Will generate:');
+        $this->line('  - Resource, Form, Table, InfoList');
         if ($this->isSimple) {
-            $this->line("  - Pages: ManageRecords (single page with modal CRUD)");
+            $this->line('  - Pages: ManageRecords (single page with modal CRUD)');
         } else {
-            $this->line("  - Pages: List, Create, Edit, View");
+            $this->line('  - Pages: List, Create, Edit, View');
         }
         if ($this->generateApi) {
-            $this->line("  - API endpoints: " . implode(', ', $this->apiMethods));
+            $this->line('  - API endpoints: '.implode(', ', $this->apiMethods));
             if ($this->useApiTester) {
-                $this->line("  - API Tester interface: Enabled");
+                $this->line('  - API Tester interface: Enabled');
             }
         }
         $this->newLine();
 
-        if (!confirm('Proceed with resource generation?', true)) {
+        if (! confirm('Proceed with resource generation?', true)) {
             $this->components->info('Generation cancelled.');
+
             return self::SUCCESS;
         }
 
@@ -617,7 +625,7 @@ class MakeResourceCommand extends Command
         $this->newLine();
         $this->components->info("Resource [{$modelName}] created successfully for panel [{$panel}]!");
         $this->newLine();
-        $this->components->info("Generated files:");
+        $this->components->info('Generated files:');
         $this->line("  Resource: app/Laravilt/{$panel}/Resources/{$modelName}/{$modelName}Resource.php");
         $this->line("  Form: app/Laravilt/{$panel}/Resources/{$modelName}/Form/{$modelName}Form.php");
         $this->line("  Table: app/Laravilt/{$panel}/Resources/{$modelName}/Table/{$modelName}Table.php");
@@ -625,7 +633,7 @@ class MakeResourceCommand extends Command
         if ($this->isSimple) {
             $this->line("  Pages: Manage{$modelName} (single page with modal CRUD)");
         } else {
-            $this->line("  Pages: List, Create, Edit, View");
+            $this->line('  Pages: List, Create, Edit, View');
         }
         if ($this->generateApi) {
             $this->line("  API: app/Laravilt/{$panel}/Resources/{$modelName}/Api/{$modelName}Api.php");
@@ -721,7 +729,7 @@ class MakeResourceCommand extends Command
 
         // Return first string column
         foreach ($columns as $column) {
-            if ($column['type'] === 'string' && !in_array($column['name'], ['id', 'uuid', 'slug'])) {
+            if ($column['type'] === 'string' && ! in_array($column['name'], ['id', 'uuid', 'slug'])) {
                 return $column['name'];
             }
         }
@@ -735,7 +743,7 @@ class MakeResourceCommand extends Command
         $registry = app(\Laravilt\Panel\PanelRegistry::class);
         $registeredPanels = $registry->all();
 
-        if (!empty($registeredPanels)) {
+        if (! empty($registeredPanels)) {
             return collect($registeredPanels)
                 ->map(fn ($panel) => Str::studly($panel->getId()))
                 ->values()
@@ -745,7 +753,7 @@ class MakeResourceCommand extends Command
         // Fallback to checking app/Laravilt directory structure
         $laraviltPath = app_path('Laravilt');
 
-        if (!File::isDirectory($laraviltPath)) {
+        if (! File::isDirectory($laraviltPath)) {
             return [];
         }
 
@@ -768,7 +776,7 @@ class MakeResourceCommand extends Command
             $tables = array_map(fn ($row) => $row->name, $results);
         } elseif ($driver === 'mysql') {
             $database = config("database.connections.{$connection}.database");
-            $results = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name", [$database]);
+            $results = DB::select('SELECT table_name FROM information_schema.tables WHERE table_schema = ? ORDER BY table_name', [$database]);
             $tables = array_map(fn ($row) => $row->table_name ?? $row->TABLE_NAME, $results);
         } elseif ($driver === 'pgsql') {
             $results = DB::select("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename");
@@ -778,7 +786,7 @@ class MakeResourceCommand extends Command
         // Filter out Laravel system tables
         $systemTables = ['migrations', 'password_reset_tokens', 'password_resets', 'failed_jobs', 'personal_access_tokens', 'jobs', 'job_batches', 'cache', 'cache_locks', 'sessions'];
 
-        return array_values(array_filter($tables, fn ($table) => !in_array($table, $systemTables)));
+        return array_values(array_filter($tables, fn ($table) => ! in_array($table, $systemTables)));
     }
 
     protected function getTableColumns(string $tableName): array
@@ -793,13 +801,13 @@ class MakeResourceCommand extends Command
                 $columns[] = [
                     'name' => $column->name,
                     'type' => $this->normalizeColumnType($column->type),
-                    'nullable' => !$column->notnull,
+                    'nullable' => ! $column->notnull,
                     'default' => $column->dflt_value,
                 ];
             }
         } elseif ($driver === 'mysql') {
             $database = config("database.connections.{$connection}.database");
-            $results = DB::select("SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_TYPE FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION", [$database, $tableName]);
+            $results = DB::select('SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_TYPE FROM information_schema.columns WHERE table_schema = ? AND table_name = ? ORDER BY ORDINAL_POSITION', [$database, $tableName]);
             foreach ($results as $column) {
                 $columns[] = [
                     'name' => $column->COLUMN_NAME,
@@ -810,7 +818,7 @@ class MakeResourceCommand extends Command
                 ];
             }
         } elseif ($driver === 'pgsql') {
-            $results = DB::select("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position", [$tableName]);
+            $results = DB::select('SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = ? ORDER BY ordinal_position', [$tableName]);
             foreach ($results as $column) {
                 $columns[] = [
                     'name' => $column->column_name,
@@ -863,12 +871,13 @@ class MakeResourceCommand extends Command
 
         if (File::exists($modelPath)) {
             $this->components->info("Model [{$modelName}] already exists, skipping...");
+
             return;
         }
 
         $fillable = collect($columns)
             ->pluck('name')
-            ->filter(fn ($name) => !in_array($name, ['id', 'created_at', 'updated_at', 'deleted_at']))
+            ->filter(fn ($name) => ! in_array($name, ['id', 'created_at', 'updated_at', 'deleted_at']))
             ->map(fn ($name) => "        '{$name}'")
             ->implode(",\n");
 
@@ -883,6 +892,7 @@ class MakeResourceCommand extends Command
                     'decimal', 'float', 'double' => 'decimal:2',
                     default => 'string',
                 };
+
                 return "        '{$col['name']}' => '{$castType}'";
             })
             ->implode(",\n");
@@ -1114,6 +1124,7 @@ PHP;
         if (empty($groupedColumns)) {
             // Fallback: single section with all fields
             $formFields = $this->generateFormFields($columns);
+
             return <<<PHP
                 Section::make('Information')
                     ->icon('info')
@@ -1190,12 +1201,12 @@ use Laravilt\Actions\RestoreBulkAction;
 use Laravilt\Tables\Filters\TrashedFilter;
 PHP;
             $softDeleteFilters = "\n                TrashedFilter::make(),";
-            $softDeleteRecordActions = <<<PHP
+            $softDeleteRecordActions = <<<'PHP'
 
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
 PHP;
-            $softDeleteBulkActions = <<<PHP
+            $softDeleteBulkActions = <<<'PHP'
 
                     ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make(),
@@ -1287,19 +1298,19 @@ PHP;
 
         // Generate method flags
         $methodFlags = [];
-        if (!in_array('index', $this->apiMethods)) {
+        if (! in_array('index', $this->apiMethods)) {
             $methodFlags[] = '->disableIndex()';
         }
-        if (!in_array('show', $this->apiMethods)) {
+        if (! in_array('show', $this->apiMethods)) {
             $methodFlags[] = '->disableShow()';
         }
-        if (!in_array('store', $this->apiMethods)) {
+        if (! in_array('store', $this->apiMethods)) {
             $methodFlags[] = '->disableStore()';
         }
-        if (!in_array('update', $this->apiMethods)) {
+        if (! in_array('update', $this->apiMethods)) {
             $methodFlags[] = '->disableUpdate()';
         }
-        if (!in_array('destroy', $this->apiMethods)) {
+        if (! in_array('destroy', $this->apiMethods)) {
             $methodFlags[] = '->disableDestroy()';
         }
 
@@ -1308,7 +1319,7 @@ PHP;
             $methodFlags[] = '->useAPITester()';
         }
 
-        $methodFlagsStr = !empty($methodFlags) ? "\n            " . implode("\n            ", $methodFlags) : '';
+        $methodFlagsStr = ! empty($methodFlags) ? "\n            ".implode("\n            ", $methodFlags) : '';
 
         $content = <<<PHP
 <?php
@@ -1351,6 +1362,7 @@ class Manage{$modelName} extends ManageRecords
 }
 PHP;
             File::put("{$dir}/Pages/Manage{$modelName}.php", $manageContent);
+
             return;
         }
 
@@ -1537,6 +1549,7 @@ PHP;
                 }
             }
         }
+
         return 'basic'; // default section
     }
 
@@ -1553,7 +1566,7 @@ PHP;
             }
 
             $sectionKey = $this->getFieldSection($column['name']);
-            if (!isset($sections[$sectionKey])) {
+            if (! isset($sections[$sectionKey])) {
                 $sections[$sectionKey] = [];
             }
             $sections[$sectionKey][] = $column;
@@ -1563,7 +1576,7 @@ PHP;
         $priority = ['basic', 'content', 'media', 'location', 'status', 'pricing', 'dates', 'settings', 'code', 'appearance', 'social', 'seo', 'flags'];
         $sortedSections = [];
         foreach ($priority as $key) {
-            if (isset($sections[$key]) && !empty($sections[$key])) {
+            if (isset($sections[$key]) && ! empty($sections[$key])) {
                 $sortedSections[$key] = $sections[$key];
             }
         }
@@ -1583,14 +1596,14 @@ PHP;
             $relation = $this->relations[$name];
             $relationMethod = Str::camel(Str::beforeLast($name, '_id'));
             $titleColumn = $relation['title_column'];
-            $required = !$nullable ? "\n{$indent}    ->required()" : '';
+            $required = ! $nullable ? "\n{$indent}    ->required()" : '';
 
             return "{$indent}Select::make('{$name}')\n{$indent}    ->relationship('{$relationMethod}', '{$titleColumn}')\n{$indent}    ->searchable()\n{$indent}    ->preload(){$required},";
         }
 
         // Detect intelligent field type
         $fieldType = $this->detectFieldType($name, $type);
-        $required = !$nullable ? "\n{$indent}    ->required()" : '';
+        $required = ! $nullable ? "\n{$indent}    ->required()" : '';
 
         // Handle field type with modifiers (e.g., TextInput:email)
         $parts = explode(':', $fieldType);
@@ -1615,6 +1628,7 @@ PHP;
                 } elseif (in_array($name, ['city', 'city_id'])) {
                     return "{$indent}Select::make('{$name}'){$required}\n{$indent}    ->options(fn (Get \$get) => \n{$indent}        // Load cities based on selected state\n{$indent}        []\n{$indent}    )\n{$indent}    ->searchable(),";
                 }
+
                 return "{$indent}Select::make('{$name}'){$required}\n{$indent}    ->options([\n{$indent}        // Add options here\n{$indent}    ]),";
 
             case 'TagsInput':
@@ -1622,6 +1636,7 @@ PHP;
 
             case 'CodeEditor':
                 $language = $this->guessCodeLanguage($name);
+
                 return "{$indent}CodeEditor::make('{$name}')\n{$indent}    ->language('{$language}')\n{$indent}    ->columnSpanFull(){$required},";
 
             case 'RichEditor':
@@ -1643,6 +1658,7 @@ PHP;
                 if ($modifier === 'image') {
                     return "{$indent}FileUpload::make('{$name}')\n{$indent}    ->image()\n{$indent}    ->directory('{$name}s'){$required},";
                 }
+
                 return "{$indent}FileUpload::make('{$name}')\n{$indent}    ->directory('{$name}s'){$required},";
 
             case 'TextInput':
@@ -1660,10 +1676,12 @@ PHP;
                 } elseif (in_array($type, ['integer', 'bigint', 'smallint', 'float', 'double', 'decimal'])) {
                     $extra = "\n{$indent}    ->numeric()";
                 }
+
                 return "{$indent}TextInput::make('{$name}'){$extra}{$required}\n{$indent}    ->maxLength(255),";
 
             case 'Toggle':
                 $default = str_contains($name, 'active') || str_contains($name, 'enabled') || str_contains($name, 'verified') || str_contains($name, 'published') || str_contains($name, 'approved') ? 'true' : 'false';
+
                 return "{$indent}Toggle::make('{$name}')\n{$indent}    ->default({$default}),";
 
             case 'DatePicker':
@@ -1685,15 +1703,34 @@ PHP;
      */
     protected function guessCodeLanguage(string $name): string
     {
-        if (str_contains($name, 'html')) return 'html';
-        if (str_contains($name, 'css') || str_contains($name, 'style')) return 'css';
-        if (str_contains($name, 'javascript') || str_contains($name, 'js') || str_contains($name, 'script')) return 'javascript';
-        if (str_contains($name, 'json')) return 'json';
-        if (str_contains($name, 'php')) return 'php';
-        if (str_contains($name, 'sql')) return 'sql';
-        if (str_contains($name, 'xml')) return 'xml';
-        if (str_contains($name, 'yaml') || str_contains($name, 'yml')) return 'yaml';
-        if (str_contains($name, 'markdown') || str_contains($name, 'md')) return 'markdown';
+        if (str_contains($name, 'html')) {
+            return 'html';
+        }
+        if (str_contains($name, 'css') || str_contains($name, 'style')) {
+            return 'css';
+        }
+        if (str_contains($name, 'javascript') || str_contains($name, 'js') || str_contains($name, 'script')) {
+            return 'javascript';
+        }
+        if (str_contains($name, 'json')) {
+            return 'json';
+        }
+        if (str_contains($name, 'php')) {
+            return 'php';
+        }
+        if (str_contains($name, 'sql')) {
+            return 'sql';
+        }
+        if (str_contains($name, 'xml')) {
+            return 'xml';
+        }
+        if (str_contains($name, 'yaml') || str_contains($name, 'yml')) {
+            return 'yaml';
+        }
+        if (str_contains($name, 'markdown') || str_contains($name, 'md')) {
+            return 'markdown';
+        }
+
         return 'plaintext';
     }
 
@@ -1704,11 +1741,11 @@ PHP;
         $types = collect($columns)->pluck('type')->unique()->toArray();
         $names = collect($columns)
             ->pluck('name')
-            ->filter(fn ($n) => !in_array($n, $this->excludedColumns))
+            ->filter(fn ($n) => ! in_array($n, $this->excludedColumns))
             ->toArray();
 
         // Check for relations (need Select)
-        if (!empty($this->relations)) {
+        if (! empty($this->relations)) {
             $imports[] = 'use Laravilt\Forms\Components\Select;';
         }
 
@@ -1795,6 +1832,7 @@ PHP;
         }
 
         sort($imports);
+
         return implode("\n", array_unique($imports));
     }
 
@@ -1826,25 +1864,29 @@ PHP;
                 $relation = $this->relations[$name];
                 $relationMethod = Str::camel(Str::beforeLast($name, '_id'));
                 $titleColumn = $relation['title_column'];
-                $tableColumns[] = "{$indent}TextColumn::make('{$relationMethod}.{$titleColumn}')\n{$indent}    ->label('" . Str::title(str_replace('_', ' ', Str::beforeLast($name, '_id'))) . "'){$sortable},";
+                $tableColumns[] = "{$indent}TextColumn::make('{$relationMethod}.{$titleColumn}')\n{$indent}    ->label('".Str::title(str_replace('_', ' ', Str::beforeLast($name, '_id')))."'){$sortable},";
+
                 continue;
             }
 
             // Handle image columns
             if (str_contains($name, 'image') || str_contains($name, 'photo') || str_contains($name, 'avatar') || str_contains($name, 'logo') || str_contains($name, 'thumbnail') || str_contains($name, 'cover') || str_contains($name, 'banner') || str_contains($name, 'picture')) {
                 $tableColumns[] = "{$indent}ImageColumn::make('{$name}')\n{$indent}    ->circular(),";
+
                 continue;
             }
 
             // Handle tags columns (array/json fields displayed as badges)
             if (in_array($name, ['tags', 'keywords', 'skills', 'labels', 'categories'])) {
                 $tableColumns[] = "{$indent}TextColumn::make('{$name}')\n{$indent}    ->badge(),";
+
                 continue;
             }
 
             // Handle boolean columns (is_*, has_*, can_*, etc.) - use ToggleColumn
             if ($type === 'boolean' || str_starts_with($name, 'is_') || str_starts_with($name, 'has_') || str_starts_with($name, 'can_') || in_array($name, ['active', 'enabled', 'visible', 'featured', 'verified', 'published', 'approved'])) {
                 $tableColumns[] = "{$indent}ToggleColumn::make('{$name}'),";
+
                 continue;
             }
 
@@ -1889,8 +1931,7 @@ PHP;
 
         // Check for boolean columns (by type or name pattern)
         $hasBooleanColumns = in_array('boolean', $types) ||
-            collect($names)->contains(fn ($n) =>
-                str_starts_with($n, 'is_') ||
+            collect($names)->contains(fn ($n) => str_starts_with($n, 'is_') ||
                 str_starts_with($n, 'has_') ||
                 str_starts_with($n, 'can_') ||
                 in_array($n, ['active', 'enabled', 'visible', 'featured', 'verified', 'published', 'approved'])
@@ -1905,6 +1946,7 @@ PHP;
         }
 
         sort($imports);
+
         return implode("\n", array_unique($imports));
     }
 
@@ -1928,7 +1970,8 @@ PHP;
                 $relation = $this->relations[$name];
                 $relationMethod = Str::camel(Str::beforeLast($name, '_id'));
                 $titleColumn = $relation['title_column'];
-                $entries[] = "{$indent}TextEntry::make('{$relationMethod}.{$titleColumn}')\n{$indent}    ->label('" . Str::title(str_replace('_', ' ', Str::beforeLast($name, '_id'))) . "'),";
+                $entries[] = "{$indent}TextEntry::make('{$relationMethod}.{$titleColumn}')\n{$indent}    ->label('".Str::title(str_replace('_', ' ', Str::beforeLast($name, '_id')))."'),";
+
                 continue;
             }
 
@@ -2021,7 +2064,7 @@ PHP;
 
         // Return first string column
         foreach ($columns as $column) {
-            if ($column['type'] === 'string' && !in_array($column['name'], $this->excludedColumns)) {
+            if ($column['type'] === 'string' && ! in_array($column['name'], $this->excludedColumns)) {
                 return $column['name'];
             }
         }
@@ -2040,7 +2083,7 @@ PHP;
         }
 
         // Return second string column or created_at
-        $stringColumns = collect($columns)->filter(fn ($col) => $col['type'] === 'string' && !in_array($col['name'], $this->excludedColumns))->values();
+        $stringColumns = collect($columns)->filter(fn ($col) => $col['type'] === 'string' && ! in_array($col['name'], $this->excludedColumns))->values();
 
         if ($stringColumns->count() > 1) {
             return $stringColumns[1]['name'];
