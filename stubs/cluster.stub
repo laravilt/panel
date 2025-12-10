@@ -1,0 +1,33 @@
+<?php
+
+namespace {{ namespace }};
+
+use Laravilt\Panel\Cluster;
+
+class {{ class }} extends Cluster
+{
+    /**
+     * The cluster's navigation icon.
+     */
+    protected static ?string $navigationIcon = '{{ icon }}';
+
+    /**
+     * The cluster's navigation label.
+     */
+    protected static ?string $navigationLabel = '{{ label }}';
+
+    /**
+     * The cluster's navigation sort order.
+     */
+    protected static ?int $navigationSort = {{ sort }};
+
+    /**
+     * The cluster's navigation group.
+     */
+    protected static ?string $navigationGroup = {{ group }};
+
+    /**
+     * Whether the cluster should register navigation.
+     */
+    protected static bool $shouldRegisterNavigation = true;
+}

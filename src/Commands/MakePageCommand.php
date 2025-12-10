@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class MakePageCommand extends GeneratorCommand
 {
-    protected $signature = 'make:panel-page {panel} {name}';
+    protected $signature = 'laravilt:page {panel} {name}';
 
     protected $description = 'Create a new panel page';
 

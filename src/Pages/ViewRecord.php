@@ -12,6 +12,30 @@ abstract class ViewRecord extends Page
     protected Model $record;
 
     /**
+     * Get the page title using the resource's label with "View" prefix.
+     */
+    public static function getTitle(): string
+    {
+        $resource = static::getResource();
+
+        if ($resource) {
+            return __('laravilt-panel::panel.pages.view_record.title', [
+                'label' => $resource::getLabel(),
+            ]);
+        }
+
+        return parent::getTitle();
+    }
+
+    /**
+     * Get the page heading using the resource's label with "View" prefix.
+     */
+    public function getHeading(): string
+    {
+        return static::getTitle();
+    }
+
+    /**
      * Display the page (GET request handler).
      * Receives the record ID from route parameter and resolves the model.
      */
@@ -63,5 +87,45 @@ abstract class ViewRecord extends Page
         }
 
         return [$infolist];
+    }
+
+    /**
+     * Get the relation managers for this record.
+     *
+     * @return array<array<string, mixed>>
+     */
+    public function getRelationManagers(): array
+    {
+        $resource = static::getResource();
+
+        if (!$resource || !isset($this->record)) {
+            return [];
+        }
+
+        $relationManagers = $resource::getRelations();
+
+        return collect($relationManagers)
+            ->map(function ($relationManagerClass) {
+                /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
+                $manager = $relationManagerClass::make($this->record);
+
+                return $manager->toArray();
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get extra props for Inertia response.
+     */
+    protected function getInertiaProps(): array
+    {
+        $resource = static::getResource();
+
+        return [
+            'record' => $this->record ?? null,
+            'relationManagers' => $this->getRelationManagers(),
+            'resourceSlug' => $resource ? $resource::getSlug() : null,
+        ];
     }
 }

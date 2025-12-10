@@ -12,6 +12,7 @@ use Laravilt\Panel\Concerns\HasColors;
 use Laravilt\Panel\Concerns\HasId;
 use Laravilt\Panel\Concerns\HasMiddleware;
 use Laravilt\Panel\Concerns\HasNavigation;
+use Laravilt\Panel\Concerns\HasNotifications;
 use Laravilt\Panel\Concerns\HasPages;
 use Laravilt\Panel\Concerns\HasPath;
 use Laravilt\Panel\Concerns\HasResources;
@@ -30,6 +31,7 @@ class Panel
     use HasId;
     use HasMiddleware;
     use HasNavigation;
+    use HasNotifications;
     use HasPages;
     use HasPath;
     use HasResources;
@@ -216,6 +218,7 @@ class Panel
         $this->bootResources();
         $this->bootNavigation();
         $this->registerAuthRoutes();
+        $this->registerNotificationRoutes();
     }
 
     /**

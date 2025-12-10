@@ -18,6 +18,7 @@
     "require": {
         "php": "^8.3|^8.4",
         "spatie/laravel-package-tools": "^1.14",
+        "laravilt/auth": "^1.0",
         "laravilt/support": "^1.0",
         "laravilt/actions": "^1.0",
         "laravilt/forms": "^1.0"

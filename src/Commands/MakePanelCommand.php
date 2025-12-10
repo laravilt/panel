@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 
 class MakePanelCommand extends Command
 {
-    protected $signature = 'make:panel {id} {--path=}';
+    protected $signature = 'laravilt:panel {id} {--path=}';
 
     protected $description = 'Create a new panel';
 
@@ -32,7 +32,7 @@ class MakePanelCommand extends Command
 
         $this->newLine();
         $this->components->info("Panel [{$id}] created successfully!");
-        $this->components->info("Panel provider: app/Providers/{$studlyId}PanelProvider.php");
+        $this->components->info("Panel provider: app/Providers/Laravilt/{$studlyId}PanelProvider.php");
         $this->components->info("Pages directory: app/Laravilt/{$studlyId}/Pages");
         $this->components->info("Resources directory: app/Laravilt/{$studlyId}/Resources");
         $this->components->info("Widgets directory: app/Laravilt/{$studlyId}/Widgets");
@@ -50,7 +50,7 @@ class MakePanelCommand extends Command
             $stub
         );
 
-        $providerPath = app_path("Providers/{$studlyId}PanelProvider.php");
+        $providerPath = app_path("Providers/Laravilt/{$studlyId}PanelProvider.php");
 
         File::ensureDirectoryExists(dirname($providerPath));
         File::put($providerPath, $content);
@@ -99,7 +99,7 @@ class MakePanelCommand extends Command
 
     protected function registerProvider(string $studlyId): void
     {
-        $provider = "App\\Providers\\{$studlyId}PanelProvider::class";
+        $provider = "App\\Providers\\Laravilt\\{$studlyId}PanelProvider::class";
         $providersFile = base_path('bootstrap/providers.php');
 
         if (! File::exists($providersFile)) {

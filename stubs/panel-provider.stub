@@ -1,30 +1,22 @@
 <?php
 
-namespace App\Providers;
+namespace App\Providers\Laravilt;
 
 use Laravilt\Panel\Panel;
 use Laravilt\Panel\PanelProvider;
-use Laravilt\Support\Colors\Color;
 
 class {{ studlyId }}PanelProvider extends PanelProvider
 {
+    /**
+     * Configure the panel.
+     */
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->id('{{ id }}')
             ->path('{{ path }}')
-            ->colors([
-                'primary' => Color::Indigo,
-            ])
-            ->brandName('{{ studlyId }} Panel')
+            ->brandName('{{ studlyId }}')
+            ->discoverAutomatically()
             ->middleware(['web', 'auth'])
-            ->discoverPages(
-                in: app_path('Laravilt/{{ studlyId }}/Pages'),
-                for: 'App\\Laravilt\\{{ studlyId }}\\Pages'
-            )
-            ->discoverWidgets(
-                in: app_path('Laravilt/{{ studlyId }}/Widgets'),
-                for: 'App\\Laravilt\\{{ studlyId }}\\Widgets'
-            );
+            ->authMiddleware(['auth']);
     }
 }

@@ -12,6 +12,30 @@ abstract class EditRecord extends Page
     protected Model $record;
 
     /**
+     * Get the page title using the resource's label with "Edit" prefix.
+     */
+    public static function getTitle(): string
+    {
+        $resource = static::getResource();
+
+        if ($resource) {
+            return __('laravilt-panel::panel.pages.edit_record.title', [
+                'label' => $resource::getLabel(),
+            ]);
+        }
+
+        return parent::getTitle();
+    }
+
+    /**
+     * Get the page heading using the resource's label with "Edit" prefix.
+     */
+    public function getHeading(): string
+    {
+        return static::getTitle();
+    }
+
+    /**
      * Display the page (GET request handler).
      * Receives the record ID from route parameter and resolves the model.
      */
@@ -228,6 +252,44 @@ abstract class EditRecord extends Page
     }
 
     /**
+     * Validate form data using schema validation rules.
+     *
+     * @param  array<string, mixed>  $data
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function validateFormData(array $data): array
+    {
+        $form = $this->form(new \Laravilt\Schemas\Schema);
+
+        $rules = $form->getValidationRules();
+        $messages = $form->getValidationMessages();
+        $attributes = $form->getValidationAttributes();
+        $prefixes = $form->getFieldPrefixes();
+
+        // Only validate if there are rules
+        if (empty($rules)) {
+            return $data;
+        }
+
+        // Prepend prefixes to field values for validation (e.g., https:// for URL fields)
+        $dataForValidation = $data;
+        foreach ($prefixes as $fieldName => $prefix) {
+            if (isset($dataForValidation[$fieldName]) && is_string($dataForValidation[$fieldName]) && $dataForValidation[$fieldName] !== '') {
+                // Only prepend if value doesn't already start with the prefix
+                if (!str_starts_with($dataForValidation[$fieldName], $prefix)) {
+                    $dataForValidation[$fieldName] = $prefix . $dataForValidation[$fieldName];
+                }
+            }
+        }
+
+        // Validate with prefixed data
+        validator($dataForValidation, $rules, $messages, $attributes)->validate();
+
+        // Return original data (without prefixes) - the storage should save the user-entered value
+        return $data;
+    }
+
+    /**
      * Get the schema (form) for this page.
      */
     public function getSchema(): array
@@ -248,25 +310,30 @@ abstract class EditRecord extends Page
         // Add actions to the bottom of the form
         $actions = [
             \Laravilt\Actions\Action::make('save')
-                ->label('Save')
+                ->label(__('laravilt-panel::panel.common.save'))
                 ->color('primary')
+                ->submit()
                 ->preserveState(false)
                 ->action(function (mixed $record, array $data) {
-                    $this->save($data);
+                    // Validate form data
+                    $validated = $this->validateFormData($data);
+
+                    $this->save($validated);
                     $redirectUrl = $this->getRedirectUrl();
 
                     \Laravilt\Notifications\Notification::success()
-                        ->title('Saved successfully')
-                        ->body('The changes have been saved.')
+                        ->title(__('notifications::notifications.success'))
+                        ->body(__('notifications::notifications.record_updated'))
                         ->send();
 
                     return redirect($redirectUrl);
                 }),
 
             \Laravilt\Actions\Action::make('cancel')
-                ->label('Cancel')
+                ->label(__('laravilt-panel::panel.common.cancel'))
                 ->color('secondary')
                 ->outlined()
+                ->method('GET')
                 ->url($resource::getUrl('list')),
         ];
 
@@ -278,5 +345,45 @@ abstract class EditRecord extends Page
         $form->schema($schema);
 
         return [$form];
+    }
+
+    /**
+     * Get the relation managers for this record.
+     *
+     * @return array<array<string, mixed>>
+     */
+    public function getRelationManagers(): array
+    {
+        $resource = static::getResource();
+
+        if (!$resource || !isset($this->record)) {
+            return [];
+        }
+
+        $relationManagers = $resource::getRelations();
+
+        return collect($relationManagers)
+            ->map(function ($relationManagerClass) {
+                /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
+                $manager = $relationManagerClass::make($this->record);
+
+                return $manager->toArray();
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Get extra props for Inertia response.
+     */
+    protected function getInertiaProps(): array
+    {
+        $resource = static::getResource();
+
+        return [
+            'record' => $this->record ?? null,
+            'relationManagers' => $this->getRelationManagers(),
+            'resourceSlug' => $resource ? $resource::getSlug() : null,
+        ];
     }
 }

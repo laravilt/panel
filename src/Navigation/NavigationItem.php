@@ -23,6 +23,8 @@ class NavigationItem implements Arrayable
 
     protected string|Closure|null $method = null;
 
+    protected string|null $translationKey = null;
+
     /**
      * Make a new navigation item.
      */
@@ -188,6 +190,24 @@ class NavigationItem implements Arrayable
     }
 
     /**
+     * Set translation key for frontend translation.
+     */
+    public function translationKey(string $key): static
+    {
+        $this->translationKey = $key;
+
+        return $this;
+    }
+
+    /**
+     * Get translation key.
+     */
+    public function getTranslationKey(): ?string
+    {
+        return $this->translationKey;
+    }
+
+    /**
      * Convert to array.
      */
     public function toArray(): array
@@ -195,6 +215,7 @@ class NavigationItem implements Arrayable
         return [
             'type' => 'item',
             'title' => $this->getLabel(),  // Frontend expects 'title'
+            'translationKey' => $this->translationKey,  // Send translation key to frontend
             'url' => $this->getUrl(),      // Frontend expects 'url'
             'icon' => $this->getIcon(),
             'badge' => $this->getBadge(),

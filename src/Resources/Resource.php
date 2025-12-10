@@ -6,6 +6,7 @@ namespace Laravilt\Panel\Resources;
 
 use Illuminate\Database\Eloquent\Model;
 use Laravilt\Schemas\Schema;
+use Laravilt\Tables\ApiResource;
 use Laravilt\Tables\Table;
 
 abstract class Resource
@@ -36,6 +37,19 @@ abstract class Resource
     protected static bool $hasApi = false;
 
     protected static bool $hasFlutter = false;
+
+    /**
+     * Whether to show this resource's stats on the dashboard.
+     */
+    protected static bool $showOnDashboard = true;
+
+    /**
+     * Check if this resource should show stats on the dashboard.
+     */
+    public static function shouldShowOnDashboard(): bool
+    {
+        return static::$showOnDashboard;
+    }
 
     public static function makeForm(): Schema
     {
@@ -70,9 +84,34 @@ abstract class Resource
         return $schema;
     }
 
-    public static function api(\Laravilt\Api\Api $api): \Laravilt\Api\Api
+    /**
+     * Create a new ApiResource instance for configuration.
+     */
+    public static function makeApiResource(): ApiResource
+    {
+        return ApiResource::make()
+            ->endpoint('/api/'.static::getSlug());
+    }
+
+    /**
+     * Configure the API resource for this resource.
+     * Override this method in your resource to customize the API configuration.
+     */
+    public static function api(ApiResource $api): ApiResource
     {
         return $api;
+    }
+
+    /**
+     * Get the configured API resource.
+     */
+    public static function getApiResource(): ?ApiResource
+    {
+        if (! static::hasApi()) {
+            return null;
+        }
+
+        return static::api(static::makeApiResource());
     }
 
     public static function flutter(\Laravilt\Flutter\Flutter $flutter): \Laravilt\Flutter\Flutter
@@ -161,14 +200,37 @@ abstract class Resource
             ->toString();
     }
 
-    public static function getUrl($panelOrPage = 'list', array $parameters = []): string
+    public static function getUrl($panelOrPage = null, array $parameters = []): string
     {
+        // Determine the default list page name based on available pages
+        $pages = static::getPages();
+        $defaultListPage = array_key_exists('list', $pages) ? 'list' : 'index';
+
         // Support both getUrl($panel) and getUrl('list', $parameters)
         if ($panelOrPage instanceof \Laravilt\Panel\Panel) {
             $panelId = $panelOrPage->getId();
-            $page = 'list';
+            $page = $defaultListPage;
+        } elseif ($panelOrPage === null) {
+            $page = $defaultListPage;
         } else {
-            $panelId = 'admin'; // Default panel ID
+            // Get current panel from registry, no hardcoded fallback
+            $registry = app(\Laravilt\Panel\PanelRegistry::class);
+            $panel = $registry->getCurrent();
+            $panelId = $panel?->getId();
+
+            // If no current panel, try to get the default panel
+            if (!$panelId) {
+                $defaultPanel = $registry->getDefault();
+                $panelId = $defaultPanel?->getId();
+            }
+
+            // Last resort: get the first registered panel
+            if (!$panelId) {
+                $allPanels = $registry->all();
+                $firstPanel = reset($allPanels);
+                $panelId = $firstPanel ? $firstPanel->getId() : 'admin';
+            }
+
             $page = $panelOrPage;
         }
 
@@ -185,7 +247,19 @@ abstract class Resource
 
     public static function hasApi(): bool
     {
-        return static::$hasApi;
+        // Auto-detect: if api() method is defined in child class (not just inherited), enable API
+        if (static::$hasApi) {
+            return true;
+        }
+
+        // Check if api() method is overridden in the child class
+        try {
+            $reflection = new \ReflectionMethod(static::class, 'api');
+
+            return $reflection->getDeclaringClass()->getName() === static::class;
+        } catch (\ReflectionException $e) {
+            return false;
+        }
     }
 
     public static function hasFlutter(): bool
@@ -239,22 +313,24 @@ abstract class Resource
     /**
      * Get API routes configuration for this resource.
      *
+     * @param  string|null  $panelPath  The panel path prefix (e.g., 'admin')
      * @return array<string, mixed>
      */
-    public static function getApiRoutes(): array
+    public static function getApiRoutes(?string $panelPath = null): array
     {
         if (! static::hasApi()) {
             return [];
         }
 
         $slug = static::getSlug();
+        $prefix = $panelPath ? "/{$panelPath}/api/{$slug}" : "/api/{$slug}";
 
         return [
-            'index' => ['method' => 'GET', 'path' => "/api/{$slug}"],
-            'show' => ['method' => 'GET', 'path' => "/api/{$slug}/{id}"],
-            'store' => ['method' => 'POST', 'path' => "/api/{$slug}"],
-            'update' => ['method' => 'PUT', 'path' => "/api/{$slug}/{id}"],
-            'destroy' => ['method' => 'DELETE', 'path' => "/api/{$slug}/{id}"],
+            'index' => ['method' => 'GET', 'path' => $prefix],
+            'show' => ['method' => 'GET', 'path' => "{$prefix}/{id}"],
+            'store' => ['method' => 'POST', 'path' => $prefix],
+            'update' => ['method' => 'PUT', 'path' => "{$prefix}/{id}"],
+            'destroy' => ['method' => 'DELETE', 'path' => "{$prefix}/{id}"],
         ];
     }
 
@@ -278,6 +354,7 @@ abstract class Resource
             'hasApi' => static::hasApi(),
             'hasFlutter' => static::hasFlutter(),
             'apiRoutes' => static::getApiRoutes(),
+            'apiResource' => static::getApiResource()?->toInertiaProps(),
         ];
     }
 }

@@ -6,6 +6,9 @@ namespace Laravilt\Panel\Resources\RelationManagers;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Laravilt\Actions\Action;
+use Laravilt\Actions\CreateAction;
+use Laravilt\Infolists\Infolist;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\Table;
 
@@ -68,6 +71,11 @@ abstract class RelationManager
         return $table;
     }
 
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist;
+    }
+
     public function isReadOnly(): bool
     {
         return false;
@@ -94,10 +102,50 @@ abstract class RelationManager
     }
 
     /**
+     * Get the header actions for the relation manager table.
+     *
+     * @return array<Action>
+     */
+    public function getHeaderActions(): array
+    {
+        $actions = [];
+
+        if ($this->canCreate() && !$this->isReadOnly()) {
+            $formSchema = $this->form(Schema::make())->getSchema();
+
+            // Build the relation URL for creating records
+            // This will be overridden by the frontend with the correct panel/resource/record context
+            $createAction = Action::make('create')
+                ->label(__('actions::actions.buttons.create') . ' ' . static::getLabel())
+                ->icon('Plus')
+                ->color('primary')
+                ->method('POST')
+                ->requiresConfirmation(true)
+                ->modalHeading(__('actions::actions.buttons.create') . ' ' . static::getLabel())
+                ->modalFormSchema($formSchema)
+                ->modalSubmitActionLabel(__('actions::actions.buttons.create'))
+                ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
+                ->preserveState(false);
+
+            $actions[] = $createAction;
+        }
+
+        return $actions;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
     {
+        $table = $this->table(Table::make());
+
+        // Add header actions to the table
+        $headerActions = $this->getHeaderActions();
+        foreach ($headerActions as $action) {
+            $table->headerActions([$action]);
+        }
+
         return [
             'relationship' => static::getRelationship(),
             'label' => static::getLabel(),
@@ -109,7 +157,9 @@ abstract class RelationManager
             'canEdit' => $this->canEdit(),
             'canDelete' => $this->canDelete(),
             'form' => $this->form(Schema::make())->toInertiaProps(),
-            'table' => $this->table(Table::make())->toInertiaProps(),
+            'infolist' => $this->infolist(Infolist::make())->toInertiaProps(),
+            'table' => $table->toInertiaProps(),
+            'headerActions' => collect($headerActions)->map(fn ($action) => $action->toArray())->values()->all(),
         ];
     }
 }

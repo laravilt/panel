@@ -8,7 +8,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "/Users/fadymondy/Sites/laravilt/packages/laravilt/panel/docs"
+        "./docs"
       ],
       "metadata": {
         "description": "Provides access to Laravilt Panel package documentation",
@@ -24,6 +24,12 @@
       "mimeType": "text/markdown"
     },
     {
+      "uri": "laravilt://panel/docs/mcp-server",
+      "name": "MCP Server Integration Guide",
+      "description": "Guide for MCP server integration and generator commands",
+      "mimeType": "text/markdown"
+    },
+    {
       "uri": "laravilt://panel/api",
       "name": "Panel API Reference",
       "description": "Complete API reference for Panel configuration",
@@ -33,6 +39,12 @@
       "uri": "laravilt://panel/pages",
       "name": "Page Development Guide",
       "description": "Guide for creating custom pages",
+      "mimeType": "text/markdown"
+    },
+    {
+      "uri": "laravilt://panel/resources",
+      "name": "Resource Development Guide",
+      "description": "Guide for creating CRUD resources",
       "mimeType": "text/markdown"
     }
   ],
@@ -85,6 +97,140 @@
           }
         },
         "required": ["pageType"]
+      }
+    },
+    {
+      "name": "list_panels",
+      "description": "List all available panels in the application",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "panel_info",
+      "description": "Get detailed information about a specific panel",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panelId": {
+            "type": "string",
+            "description": "Panel identifier (e.g., 'admin', 'app')"
+          }
+        },
+        "required": ["panelId"]
+      }
+    },
+    {
+      "name": "generate_panel",
+      "description": "Generate a new panel with scaffolding. Uses: php artisan laravilt:panel {id} [--path=]",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Panel identifier (kebab-case recommended)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Custom URL path for the panel (defaults to /{id})"
+          }
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "generate_page",
+      "description": "Generate a new page for a panel. Uses: php artisan laravilt:page {panel} {name}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panel": {
+            "type": "string",
+            "description": "Panel name (StudlyCase)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Page name (can include subdirectories like Users/Profile)"
+          }
+        },
+        "required": ["panel", "name"]
+      }
+    },
+    {
+      "name": "generate_resource",
+      "description": "Generate a complete CRUD resource from a database table. Uses: php artisan laravilt:resource {panel} [--table=] [--model=]",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panel": {
+            "type": "string",
+            "description": "Panel name (StudlyCase)"
+          },
+          "table": {
+            "type": "string",
+            "description": "Database table name"
+          },
+          "model": {
+            "type": "string",
+            "description": "Custom model name (defaults to singular StudlyCase of table)"
+          },
+          "withGrid": {
+            "type": "boolean",
+            "description": "Generate Grid view (default: false)"
+          },
+          "withApi": {
+            "type": "boolean",
+            "description": "Generate API endpoints (default: false)"
+          }
+        },
+        "required": ["panel", "table"]
+      }
+    },
+    {
+      "name": "list_resources",
+      "description": "List all resources in a panel",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panel": {
+            "type": "string",
+            "description": "Panel name"
+          }
+        },
+        "required": ["panel"]
+      }
+    },
+    {
+      "name": "resource_info",
+      "description": "Get detailed information about a specific resource",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "panel": {
+            "type": "string",
+            "description": "Panel name"
+          },
+          "resource": {
+            "type": "string",
+            "description": "Resource name"
+          }
+        },
+        "required": ["panel", "resource"]
+      }
+    },
+    {
+      "name": "get_icon_mapping",
+      "description": "Get the icon name for a table/model name based on keyword mapping",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyword": {
+            "type": "string",
+            "description": "Table or model name to look up icon for"
+          }
+        },
+        "required": ["keyword"]
       }
     }
   ]

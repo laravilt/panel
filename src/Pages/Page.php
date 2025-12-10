@@ -4,7 +4,6 @@ namespace Laravilt\Panel\Pages;
 
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Traits\Conditionable;
-use Illuminate\View\Component as ViewComponent;
 use Laravilt\Actions\Concerns\InteractsWithActions;
 use Laravilt\Actions\Contracts\HasActions;
 use Laravilt\Forms\Concerns\InteractsWithForms;
@@ -20,7 +19,7 @@ use Laravilt\Panel\Facades\Panel as PanelFacade;
 use Laravilt\Panel\Panel;
 use Laravilt\Support\Concerns\EvaluatesClosures;
 
-abstract class Page extends ViewComponent implements HasActions, HasForms, HasPanelContract, Htmlable
+abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
 {
     use Conditionable;
     use EvaluatesClosures;
@@ -79,9 +78,9 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
     protected static ?string $slug = null;
 
     /**
-     * The page view.
+     * The default Vue component for this page.
      */
-    protected static string $view = 'laravilt-panel::pages.blank';
+    protected static string $view = 'laravilt/Page';
 
     /**
      * The panel instance.
@@ -246,14 +245,6 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
     public function getSubheading(): ?string
     {
         return null;
-    }
-
-    /**
-     * Get the view data.
-     */
-    protected function getViewData(): array
-    {
-        return [];
     }
 
     /**
@@ -496,11 +487,7 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
     }
 
     /**
-     * Render the page.
-     *
-     * Supports both rendering modes:
-     * 1. Inertia mode (default) - renders via Inertia.js
-     * 2. Component mode - renders via PageLayout component with Blade bridge
+     * Render the page via Inertia.js with Vue component.
      */
     public function render(?string $component = null)
     {
@@ -509,22 +496,6 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
             $this->component = $component;
         }
 
-        // Check if should use component mode (when page has custom view or uses component rendering)
-        if ($this->shouldUseComponentMode()) {
-            $html = $this->renderAsComponent();
-
-            // If this is a Laravilt AJAX request, return JSON
-            if (request()->header('X-Laravilt') === 'true') {
-                return response()->json([
-                    'html' => $html,
-                    'title' => $this->getHeading(),
-                ]);
-            }
-
-            return $html;
-        }
-
-        // Default: Inertia mode
         $clusterClass = static::getCluster();
         $clusterNavigation = $this->getClusterNavigation();
 
@@ -532,41 +503,46 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
         $schema = method_exists($this, 'getSchema') ? $this->getSchema() : [];
         $schema = $this->configureActions($schema);
 
+        // Get panel ID for action context
+        $panelId = $this->getPanel()?->getId();
+
+        // Get all actions (getHeaderActions already includes getActions via trait)
+        $allActions = collect($this->getHeaderActions())
+            ->filter(fn ($action) => is_object($action))
+            ->map(function ($action) use ($panelId) {
+                // Clone action to avoid modifying the original
+                $actionClone = clone $action;
+
+                // Set component context so actions can auto-configure (including panel ID)
+                $actionClone->component(static::class, null, $panelId);
+
+                // If action works with records (Edit/View on EditRecord/ViewRecord pages), configure it
+                if (isset($this->record)) {
+                    $actionClone->resolveRecordContext($this->record->id);
+                }
+
+                return $actionClone->toArray();
+            })->values()->all();
+
         $baseProps = [
             'page' => [
                 'heading' => $this->getHeading(),
                 'subheading' => $this->getSubheading(),
-                'headerActions' => collect($this->getHeaderActions())
-                    ->filter(fn ($action) => is_object($action))
-                    ->map(function ($action) {
-                        // Clone action to avoid modifying the original
-                        $actionClone = clone $action;
-
-                        // Set component context so actions can auto-configure
-                        $actionClone->component(static::class);
-
-                        // If action works with records (Edit/View on EditRecord/ViewRecord pages), configure it
-                        if (isset($this->record)) {
-                            $actionClone->resolveRecordContext($this->record->id);
-                        }
-
-                        return $actionClone->toArray();
-                    })->values()->all(),
-                'actionUrl' => $this->getActionUrl(), // URL for executing actions
+                'headerActions' => $allActions,
+                'actionUrl' => $this->getActionUrl(),
             ],
             'breadcrumbs' => $this->getBreadcrumbs(),
             'pageSlug' => static::getSlug(),
             'panelId' => $this->getPanel()->getId(),
             'layout' => $this->getLayout(),
+            'formController' => static::class, // For reactive fields
             'schema' => collect($schema)
                 ->filter(fn ($item) => is_object($item) && (method_exists($item, 'toInertiaProps') || method_exists($item, 'toLaraviltProps')))
                 ->map(function ($item) {
-                    // Try toInertiaProps first (for Schema objects), then toLaraviltProps (for Field/Entry components)
                     return method_exists($item, 'toInertiaProps') ? $item->toInertiaProps() : $item->toLaraviltProps();
                 })
                 ->values()
                 ->toArray(),
-            'content' => $this->getBladeContent(),
             'topHook' => $this->getTopHook(),
             'bottomHook' => $this->getBottomHook(),
             'clusterNavigation' => $clusterNavigation,
@@ -575,104 +551,12 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
         ];
 
         $inertiaProps = $this->getInertiaProps();
-
         $props = array_merge($baseProps, $inertiaProps);
 
-        // Debug: Find any Eloquent models in props
-        $findModels = function($data, $path = '') use (&$findModels) {
-            if (is_object($data) && $data instanceof \Illuminate\Database\Eloquent\Model) {
-                \Log::error('[Page] Found Eloquent Model in props!', [
-                    'path' => $path,
-                    'class' => get_class($data),
-                    'id' => method_exists($data, 'getKey') ? $data->getKey() : null,
-                ]);
-            } elseif (is_array($data)) {
-                foreach ($data as $key => $value) {
-                    $findModels($value, $path ? "$path.$key" : $key);
-                }
-            } elseif (is_object($data) && !($data instanceof \Closure)) {
-                foreach (get_object_vars($data) as $key => $value) {
-                    $findModels($value, $path ? "$path.$key" : $key);
-                }
-            }
-        };
-        $findModels($props);
-
-        // Use custom component if set, otherwise use default
-        $componentName = $this->component ?? 'laravilt/Page';
+        // Use custom component if set, otherwise use $view property
+        $componentName = $this->component ?? static::$view;
 
         return \Inertia\Inertia::render($componentName, $props);
-    }
-
-    /**
-     * Check if should use component rendering mode.
-     */
-    protected function shouldUseComponentMode(): bool
-    {
-        // Use component mode if page defines a custom view
-        return static::$view !== 'laravilt-panel::pages.blank';
-    }
-
-    /**
-     * Render page using PageLayout component.
-     */
-    protected function renderAsComponent(): string
-    {
-        // For auth pages or pages that don't need the panel layout,
-        // just render the Blade content directly
-        if ($this->isStandalonePage()) {
-            return $this->getBladeContent();
-        }
-
-        // For regular panel pages, wrap in PageLayout
-        $layout = \Laravilt\Panel\Components\PageLayout::make('page-layout')
-            ->panel($this->getPanel())
-            ->breadcrumbs($this->getBreadcrumbs())
-            ->heading($this->getHeading())
-            ->subheading($this->getSubheading())
-            ->headerActions($this->getHeaderActions())
-            ->content($this->getBladeContent());
-
-        // Create a temporary view to wrap the page content in the app layout
-        return view()->make('laravilt-panel::pages.wrapper', [
-            'pageContent' => $layout->render(),
-        ])->render();
-    }
-
-    /**
-     * Check if this is a standalone page (no panel layout needed).
-     */
-    protected function isStandalonePage(): bool
-    {
-        // Auth pages should be standalone
-        return str_contains(static::$view, 'auth.');
-    }
-
-    /**
-     * Get Blade content if using blade view.
-     */
-    protected function getBladeContent(): ?string
-    {
-        // If the view is the default blank view, we assume we want to render via Inertia/Vue schema
-        // We also check for the 'laravilt::' prefix just in case of legacy/typo issues
-        if (in_array(static::$view, ['laravilt-panel::pages.blank', 'laravilt::pages.blank'])) {
-            return null;
-        }
-
-        // For backward compatibility, allow pages to render blade content
-        if (method_exists($this, 'getView') || static::$view !== 'laravilt-panel::pages.blank') {
-            $content = view(static::$view, array_merge([
-                'page' => $this,
-                'heading' => $this->getHeading(),
-                'subheading' => $this->getSubheading(),
-                'actions' => $this->getActions(),
-                'breadcrumbs' => $this->getBreadcrumbs(),
-            ], $this->getViewData()))->render();
-
-            return empty(trim($content)) ? null : $content;
-        }
-
-        return null;
     }
 
     /**
@@ -699,24 +583,4 @@ abstract class Page extends ViewComponent implements HasActions, HasForms, HasPa
         //
     }
 
-    /**
-     * Serialize page for Laravilt (Blade + Vue.js).
-     */
-    public function toLaraviltProps(): array
-    {
-        return [
-            'page' => [
-                'heading' => $this->getHeading(),
-                'subheading' => $this->getSubheading(),
-                'title' => $this->getTitle(),
-            ],
-            'breadcrumbs' => $this->getBreadcrumbs(),
-            'panel' => $this->getPanel() ? [
-                'id' => $this->getPanel()->getId(),
-                'path' => $this->getPanel()->getPath(),
-                'brandName' => $this->getPanel()->getBrandName(),
-                'brandLogo' => $this->getPanel()->getBrandLogo(),
-            ] : null,
-        ];
-    }
 }

@@ -1,0 +1,20 @@
+<?php
+
+namespace {{ namespace }};
+
+use Laravilt\Tables\ApiColumn;
+use Laravilt\Tables\ApiResource;
+
+class {{ class }}Api
+{
+    public static function configure(ApiResource $api): ApiResource
+    {
+        return $api
+            ->columns([
+                ApiColumn::make('id')->type('integer')->sortable(),
+{{ columns }}
+                ApiColumn::make('created_at')->type('datetime')->sortable(),
+                ApiColumn::make('updated_at')->type('datetime')->sortable(),
+            ]);
+    }
+}

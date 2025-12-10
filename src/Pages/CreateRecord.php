@@ -9,11 +9,34 @@ use Laravilt\Schemas\Schema;
 
 abstract class CreateRecord extends Page
 {
-
     /**
      * @var array<string, mixed>
      */
     protected array $data = [];
+
+    /**
+     * Get the page title using the resource's label with "Create" prefix.
+     */
+    public static function getTitle(): string
+    {
+        $resource = static::getResource();
+
+        if ($resource) {
+            return __('laravilt-panel::panel.pages.create_record.title', [
+                'label' => $resource::getLabel(),
+            ]);
+        }
+
+        return parent::getTitle();
+    }
+
+    /**
+     * Get the page heading using the resource's label with "Create" prefix.
+     */
+    public function getHeading(): string
+    {
+        return static::getTitle();
+    }
 
     public function form(Schema $schema): Schema
     {
@@ -111,6 +134,44 @@ abstract class CreateRecord extends Page
     }
 
     /**
+     * Validate form data using schema validation rules.
+     *
+     * @param  array<string, mixed>  $data
+     * @throws \Illuminate\Validation\ValidationException
+     */
+    protected function validateFormData(array $data): array
+    {
+        $form = $this->form(new \Laravilt\Schemas\Schema);
+
+        $rules = $form->getValidationRules();
+        $messages = $form->getValidationMessages();
+        $attributes = $form->getValidationAttributes();
+        $prefixes = $form->getFieldPrefixes();
+
+        // Only validate if there are rules
+        if (empty($rules)) {
+            return $data;
+        }
+
+        // Prepend prefixes to field values for validation (e.g., https:// for URL fields)
+        $dataForValidation = $data;
+        foreach ($prefixes as $fieldName => $prefix) {
+            if (isset($dataForValidation[$fieldName]) && is_string($dataForValidation[$fieldName]) && $dataForValidation[$fieldName] !== '') {
+                // Only prepend if value doesn't already start with the prefix
+                if (!str_starts_with($dataForValidation[$fieldName], $prefix)) {
+                    $dataForValidation[$fieldName] = $prefix . $dataForValidation[$fieldName];
+                }
+            }
+        }
+
+        // Validate with prefixed data
+        validator($dataForValidation, $rules, $messages, $attributes)->validate();
+
+        // Return original data (without prefixes) - the storage should save the user-entered value
+        return $data;
+    }
+
+    /**
      * Get the schema (form) for this page.
      */
     public function getSchema(): array
@@ -125,42 +186,51 @@ abstract class CreateRecord extends Page
         // Add actions to the bottom of the form (as standalone actions, not component-based)
         $actions = [
             \Laravilt\Actions\Action::make('create')
-                ->label('Create')
+                ->label(__('laravilt-panel::panel.common.create'))
                 ->color('primary')
+                ->submit()
                 ->preserveState(false)
                 ->action(function (mixed $record, array $data) {
-                    $newRecord = $this->createRecord($data);
+                    // Validate form data
+                    $validated = $this->validateFormData($data);
+
+                    $newRecord = $this->createRecord($validated);
                     $redirectUrl = $this->getRedirectUrl();
 
                     \Laravilt\Notifications\Notification::success()
-                        ->title('Created successfully')
-                        ->body('The record has been created.')
+                        ->title(__('notifications::notifications.success'))
+                        ->body(__('notifications::notifications.record_created'))
                         ->send();
 
                     return redirect($redirectUrl);
                 }),
 
             \Laravilt\Actions\Action::make('createAnother')
-                ->label('Create & Create Another')
+                ->label(__('laravilt-panel::panel.common.create_and_create_another'))
                 ->color('secondary')
+                ->submit()
                 ->preserveState(false)
                 ->action(function (mixed $record, array $data) {
-                    $this->createRecord($data);
+                    // Validate form data
+                    $validated = $this->validateFormData($data);
+
+                    $this->createRecord($validated);
                     $resource = static::getResource();
                     $createUrl = $resource::getUrl('create');
 
                     \Laravilt\Notifications\Notification::success()
-                        ->title('Created successfully')
-                        ->body('The record has been created. You can create another one.')
+                        ->title(__('notifications::notifications.success'))
+                        ->body(__('notifications::notifications.record_created'))
                         ->send();
 
                     return redirect($createUrl);
                 }),
 
             \Laravilt\Actions\Action::make('cancel')
-                ->label('Cancel')
+                ->label(__('laravilt-panel::panel.common.cancel'))
                 ->color('secondary')
                 ->outlined()
+                ->method('GET')
                 ->url($resource::getUrl('list')),
         ];
 

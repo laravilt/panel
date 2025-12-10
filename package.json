@@ -1,43 +1,108 @@
 {
-    "name": "{{ package }}",
+    "name": "@laravilt/panel",
     "version": "1.0.0",
-    "private": true,
+    "description": "Complete admin panel system with resources, pages, navigation, multi-tenancy, and customizable layouts. Build powerful admin interfaces with CRUD resources, custom pages, and multiple panels.",
+    "author": "Fady Mondy <info@3x1.io>",
+    "license": "MIT",
     "type": "module",
+    "main": "./dist/panel.umd.js",
+    "module": "./dist/panel.es.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/panel.es.js",
+            "require": "./dist/panel.umd.js"
+        },
+        "./style.css": "./dist/style.css"
+    },
+    "files": [
+        "dist",
+        "resources"
+    ],
+    "keywords": [
+        "laravilt",
+        "panel",
+        "admin",
+        "dashboard",
+        "resources",
+        "crud",
+        "pages",
+        "navigation",
+        "multi-tenancy",
+        "vue",
+        "vue3",
+        "inertia",
+        "laravel"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/laravilt/panel"
+    },
+    "bugs": {
+        "url": "https://github.com/laravilt/panel/issues"
+    },
+    "homepage": "https://laravilt.dev/panel",
     "scripts": {
         "dev": "vite",
         "build": "vite build",
+        "build:types": "vue-tsc --declaration --emitDeclarationOnly --outDir dist resources/js/app.ts || true",
+        "build:npm": "npm run build",
+        "prepublishOnly": "npm run build:npm",
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
-        "lint": "eslint . --fix"
+        "lint": "eslint . --fix",
+        "test": "npx playwright test",
+        "test:headed": "npx playwright test --headed"
+    },
+    "peerDependencies": {
+        "@inertiajs/vue3": "^2.0.0",
+        "@laravilt/support": "^1.0.0",
+        "@laravilt/schemas": "^1.0.0",
+        "@laravilt/forms": "^1.0.0",
+        "@laravilt/tables": "^1.0.0",
+        "@laravilt/actions": "^1.0.0",
+        "@laravilt/notifications": "^1.0.0",
+        "vue": "^3.3.0"
+    },
+    "peerDependenciesMeta": {
+        "@laravilt/auth": {
+            "optional": true
+        },
+        "@laravilt/widgets": {
+            "optional": true
+        },
+        "@laravilt/infolists": {
+            "optional": true
+        }
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
+        "@playwright/test": "^1.49.1",
         "@tailwindcss/vite": "^4.1.11",
         "@types/node": "^22.13.5",
         "@vitejs/plugin-vue": "^6.0.0",
         "@vue/eslint-config-typescript": "^14.3.0",
+        "@vueuse/core": "^14.1.0",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
         "eslint": "^9.17.0",
         "eslint-config-prettier": "^10.0.1",
         "eslint-plugin-vue": "^9.32.0",
+        "lucide-vue-next": "^0.555.0",
         "prettier": "^3.4.2",
         "prettier-plugin-organize-imports": "^4.1.0",
         "prettier-plugin-tailwindcss": "^0.6.11",
+        "radix-vue": "^1.9.17",
+        "reka-ui": "^2.6.1",
+        "tailwind-merge": "^3.4.0",
         "typescript": "^5.2.2",
         "typescript-eslint": "^8.23.0",
         "vite": "^7.0.4",
+        "vue": "^3.5.13",
         "vue-tsc": "^2.2.4"
     },
     "dependencies": {
-        "laravel-vite-plugin": "^2.0.0",
-        "tailwindcss": "^4.1.1",
-        "vue": "^3.5.13"
-    },
-    "optionalDependencies": {
-        "@rollup/rollup-linux-x64-gnu": "4.9.5",
-        "@rollup/rollup-win32-x64-msvc": "4.9.5",
-        "@tailwindcss/oxide-linux-x64-gnu": "^4.0.1",
-        "@tailwindcss/oxide-win32-x64-msvc": "^4.0.1",
-        "lightningcss-linux-x64-gnu": "^1.29.1",
-        "lightningcss-win32-x64-msvc": "^1.29.1"
+        "tailwindcss": "^4.1.1"
     }
 }

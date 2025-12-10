@@ -84,6 +84,11 @@ trait HasAuth
     protected ?array $connectedAccountsConfig = null;
 
     /**
+     * Locale and timezone configuration.
+     */
+    protected ?array $localeTimezoneConfig = null;
+
+    /**
      * Require password for social login users.
      */
     protected bool $requirePasswordForSocialLogin = true;
@@ -852,6 +857,54 @@ trait HasAuth
     }
 
     /**
+     * Configure locale and timezone settings.
+     */
+    public function localeTimezone(?string $page = null, ?string $path = null): static
+    {
+        $this->localeTimezoneConfig = [
+            'enabled' => true,
+            'page' => $page ?? \Laravilt\Auth\Pages\LocaleTimezone::class,
+            'path' => $path ?? 'settings/locale-timezone',
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Disable locale and timezone settings.
+     */
+    public function disableLocaleTimezone(): static
+    {
+        $this->localeTimezoneConfig = ['enabled' => false];
+
+        return $this;
+    }
+
+    /**
+     * Check if locale and timezone settings is enabled.
+     */
+    public function hasLocaleTimezone(): bool
+    {
+        return $this->localeTimezoneConfig['enabled'] ?? false;
+    }
+
+    /**
+     * Get locale and timezone page class.
+     */
+    public function getLocaleTimezonePage(): ?string
+    {
+        return $this->localeTimezoneConfig['page'] ?? null;
+    }
+
+    /**
+     * Get locale and timezone path.
+     */
+    public function getLocaleTimezonePath(): string
+    {
+        return $this->localeTimezoneConfig['path'] ?? 'settings/locale-timezone';
+    }
+
+    /**
      * Build auth user menu items.
      */
     public function buildAuthUserMenu(\Laravilt\Panel\Navigation\UserMenu $menu): void
@@ -860,15 +913,21 @@ trait HasAuth
         if ($this->hasProfile() || $this->hasTwoFactor() || $this->hasSessionManagement() ||
             $this->hasApiTokens() || $this->hasPasskeys() || $this->hasConnectedAccounts()) {
 
-            $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make('Settings')
+            $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make(__('laravilt-panel::panel.user_menu.settings'))
+                ->translationKey('laravilt-panel::panel.user_menu.settings')
                 ->icon('cog-6-tooth')
                 ->url($this->url('settings/profile')));
         }
 
-        // Add Logout
-        $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make('Logout')
+        // Add Logout - use panel's logout route if login is enabled, otherwise fallback to Laravel's logout route
+        $logoutUrl = $this->hasLogin()
+            ? route($this->getId().'.logout')
+            : (Route::has('logout') ? route('logout') : '/logout');
+
+        $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make(__('laravilt-panel::panel.user_menu.logout'))
+            ->translationKey('laravilt-panel::panel.user_menu.logout')
             ->icon('arrow-right-on-rectangle')
-            ->url(route($this->getId().'.logout'))
+            ->url($logoutUrl)
             ->method('post'));
     }
 
@@ -907,6 +966,10 @@ trait HasAuth
             $pages[] = \Laravilt\Auth\Pages\Profile\ConnectedAccounts::class;
         }
 
+        if ($this->hasLocaleTimezone() && class_exists(\Laravilt\Auth\Pages\LocaleTimezone::class)) {
+            $pages[] = \Laravilt\Auth\Pages\LocaleTimezone::class;
+        }
+
         // Add Settings cluster if not already registered
         if (count($pages) > 0 && class_exists(\Laravilt\Auth\Clusters\Settings::class)) {
             array_unshift($pages, \Laravilt\Auth\Clusters\Settings::class);
@@ -920,7 +983,12 @@ trait HasAuth
      */
     public function registerAuthRoutes(): void
     {
-        Route::middleware(['web'])
+        Route::middleware([
+            'web',
+            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
+            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
+            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+        ])
             ->prefix($this->getPath())
             ->group(function () {
                 // Login routes
@@ -1012,7 +1080,8 @@ trait HasAuth
         Route::middleware(array_merge(
             ['web'],
             ['auth'.($this->getAuthGuard() ? ':'.$this->getAuthGuard() : '')],
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()]
+            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
+            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class]
         ))
             ->prefix($this->getPath())
             ->group(function () {
@@ -1025,7 +1094,9 @@ trait HasAuth
         // Two-Factor Authentication challenge routes (guest or mid-authentication)
         Route::middleware(array_merge(
             ['web'],
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()]
+            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
+            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
+            [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
         ))
             ->prefix($this->getPath())
             ->group(function () {
@@ -1035,11 +1106,18 @@ trait HasAuth
 
                     Route::post('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'store'])
                         ->name($this->getId().'.two-factor.challenge.verify');
+
+                    Route::post('two-factor/resend', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'resend'])
+                        ->middleware(['throttle:3,1'])
+                        ->name($this->getId().'.two-factor.resend');
                 }
 
                 if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class)) {
                     Route::get('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'create'])
                         ->name($this->getId().'.two-factor.recovery');
+
+                    Route::post('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'store'])
+                        ->name($this->getId().'.two-factor.recovery.verify');
                 }
 
                 // Passkey login routes (for 2FA alternative)
@@ -1060,9 +1138,12 @@ trait HasAuth
             });
 
         // Authenticated routes
+        // IMPORTANT: IdentifyPanel must come BEFORE 'panel.auth' so that redirectTo() knows the current panel
         $authenticatedMiddleware = array_merge(
-            ['web', 'auth'],
+            ['web'],
             [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
+            ['panel.auth'],
+            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
             [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
         );
 
@@ -1071,8 +1152,10 @@ trait HasAuth
             $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequirePassword::class;
         }
 
-        // Always add RequireTwoFactorAuthentication middleware for authenticated users
-        $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication::class;
+        // Only add RequireTwoFactorAuthentication middleware if 2FA is enabled for this panel
+        if ($this->hasTwoFactor()) {
+            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication::class;
+        }
 
         Route::middleware($authenticatedMiddleware)
             ->prefix($this->getPath())
@@ -1082,6 +1165,10 @@ trait HasAuth
                     Route::post('logout', [$loginPage, 'destroy'])
                         ->name($this->getId().'.logout');
                 }
+
+                // Quick locale update route
+                Route::post('locale', [\Laravilt\Panel\Http\Controllers\LocaleController::class, 'update'])
+                    ->name($this->getId().'.locale.update');
 
                 // Email verification verify route
                 if ($this->hasEmailVerification() && $emailVerificationPage = $this->getEmailVerificationConfig()['page'] ?? null) {
@@ -1102,7 +1189,7 @@ trait HasAuth
                         $clusterSlug = $clusterClass::getSlug();
                         $pageSlug = $profilePage::getSlug();
                         Route::get($this->getProfilePath(), function () use ($clusterSlug, $pageSlug) {
-                            $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrentPanel();
+                            $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
 
                             return redirect($panel->url("{$clusterSlug}/{$pageSlug}"));
                         })->name($this->getId().'.profile');

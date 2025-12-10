@@ -107,8 +107,8 @@ const dashboardHref = computed(() => `/${panel.value.path || 'admin'}`);
                                 />
                             </div>
                             <!-- Brand Name -->
-                            <div class="ml-1 grid flex-1 text-left text-sm">
-                                <span class="mb-0.5 truncate leading-tight font-semibold">
+                            <div class="ms-1 grid flex-1 text-sm">
+                                <span class="mb-0.5 truncate leading-tight font-semibold text-start rtl:text-right">
                                     {{ panel.brandName || 'Admin Panel' }}
                                 </span>
                             </div>

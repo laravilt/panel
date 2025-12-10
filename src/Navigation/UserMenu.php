@@ -50,7 +50,8 @@ class UserMenu implements Arrayable
         // Add profile link if route exists
         try {
             if (function_exists('route') && route('profile.edit', [], false)) {
-                $items[] = NavigationItem::make('Profile')
+                $items[] = NavigationItem::make(__('laravilt-panel::panel.user_menu.profile'))
+                    ->translationKey('laravilt-panel::panel.user_menu.profile')
                     ->icon('heroicon-o-user')
                     ->url(route('profile.edit'));
             }
@@ -61,7 +62,8 @@ class UserMenu implements Arrayable
         // Add settings link if route exists
         try {
             if (function_exists('route') && route('settings.index', [], false)) {
-                $items[] = NavigationItem::make('Settings')
+                $items[] = NavigationItem::make(__('laravilt-panel::panel.user_menu.settings'))
+                    ->translationKey('laravilt-panel::panel.user_menu.settings')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->url(route('settings.index'));
             }
@@ -72,13 +74,15 @@ class UserMenu implements Arrayable
         // Add logout link
         try {
             $logoutUrl = route('logout', [], false) ?: '#';
-            $items[] = NavigationItem::make('Logout')
+            $items[] = NavigationItem::make(__('laravilt-panel::panel.user_menu.logout'))
+                ->translationKey('laravilt-panel::panel.user_menu.logout')
                 ->icon('heroicon-o-arrow-right-on-rectangle')
                 ->url($logoutUrl)
                 ->method('post');
         } catch (\Exception $e) {
             // Fallback to # if route doesn't exist
-            $items[] = NavigationItem::make('Logout')
+            $items[] = NavigationItem::make(__('laravilt-panel::panel.user_menu.logout'))
+                ->translationKey('laravilt-panel::panel.user_menu.logout')
                 ->icon('heroicon-o-arrow-right-on-rectangle')
                 ->url('#')
                 ->method('post');

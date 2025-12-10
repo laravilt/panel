@@ -13,12 +13,31 @@ trait HasBreadcrumbs
 
         // Add home/dashboard
         $breadcrumbs[] = [
-            'label' => 'Dashboard',
+            'label' => __('laravilt-panel::panel.navigation.dashboard'),
             'url' => $this->getPanel()->url(),
         ];
 
-        // Add navigation group if exists
-        if ($group = static::getNavigationGroup()) {
+        // Add cluster if this page belongs to one
+        if (method_exists(static::class, 'getCluster') && ($clusterClass = static::getCluster())) {
+            if (class_exists($clusterClass)) {
+                $clusterLabel = method_exists($clusterClass, 'getNavigationLabel')
+                    ? $clusterClass::getNavigationLabel()
+                    : (method_exists($clusterClass, 'getClusterTitle')
+                        ? $clusterClass::getClusterTitle()
+                        : class_basename($clusterClass));
+
+                $clusterUrl = method_exists($clusterClass, 'getUrl')
+                    ? $clusterClass::getUrl()
+                    : null;
+
+                $breadcrumbs[] = [
+                    'label' => $clusterLabel,
+                    'url' => $clusterUrl,
+                ];
+            }
+        }
+        // Add navigation group if exists (and no cluster)
+        elseif ($group = static::getNavigationGroup()) {
             $breadcrumbs[] = [
                 'label' => $group,
                 'url' => null,

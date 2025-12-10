@@ -2,10 +2,16 @@
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import ActionButton from '@laravilt/actions/components/ActionButton.vue';
 import ErrorProvider from '@laravilt/forms/components/ErrorProvider.vue';
-import SchemaRenderer from '@laravilt/schemas/components/SchemaRenderer.vue';
-import TableRenderer from '@laravilt/tables/components/TableRenderer.vue';
+import Schema from '@laravilt/schemas/components/Schema.vue';
+import Table from '@laravilt/tables/components/Table.vue';
+import ApiTester from '@laravilt/tables/components/ApiTester.vue';
 import SocialLogin from '@laravilt/auth/components/SocialLogin.vue';
+import OtpResendHook from '@laravilt/auth/components/OtpResendHook.vue';
+import RelationManagers from '../../components/RelationManagers.vue';
+import { useLocalization } from '@laravilt/support/composables';
 import { computed, onMounted, ref, markRaw, watch } from 'vue';
+
+const { trans } = useLocalization();
 import CardLayout from '../../layouts/CardLayout.vue';
 import PanelLayout from '../../layouts/PanelLayout.vue';
 import SettingsLayout from '../../layouts/SettingsLayout.vue';
@@ -15,6 +21,11 @@ import SettingsLayout from '../../layouts/SettingsLayout.vue';
 const PanelLayoutRaw = markRaw(PanelLayout);
 const CardLayoutRaw = markRaw(CardLayout);
 const SettingsLayoutRaw = markRaw(SettingsLayout);
+
+// Hook components map for dynamic rendering
+const hookComponents: Record<string, any> = {
+    OtpResendHook,
+};
 
 interface BreadcrumbItem {
     label: string;
@@ -43,6 +54,7 @@ const props = defineProps<{
     schema?: any[];
     layout?: 'panel' | 'card' | 'simple' | 'full' | 'settings';
     formAction?: string;
+    formController?: string;
     clusterNavigation?: NavigationItem[];
     clusterTitle?: string;
     clusterDescription?: string;
@@ -73,7 +85,15 @@ const props = defineProps<{
         | { component: string; props?: Record<string, any> }
         | null;
     hasViewToggle?: boolean;
-    currentView?: 'table' | 'grid';
+    hasGridOption?: boolean;
+    hasApiOption?: boolean;
+    availableViews?: string[];
+    currentView?: 'table' | 'grid' | 'api';
+    apiResource?: any;
+    apiToken?: string | null;
+    record?: any;
+    relationManagers?: any[];
+    resourceSlug?: string;
 }>();
 
 // View toggle functionality - saves preference to localStorage per resource
@@ -82,21 +102,22 @@ const getViewStorageKey = () => {
     return `laravilt_view_${props.pageSlug || 'default'}`;
 };
 
-const getSavedView = (): 'table' | 'grid' | null => {
+const getSavedView = (): 'table' | 'grid' | 'api' | null => {
     if (typeof window === 'undefined') return null;
     const saved = localStorage.getItem(getViewStorageKey());
-    if (saved === 'table' || saved === 'grid') {
-        return saved;
+    const validViews = props.availableViews || ['table', 'grid'];
+    if (saved && validViews.includes(saved)) {
+        return saved as 'table' | 'grid' | 'api';
     }
     return null;
 };
 
-const saveViewPreference = (view: 'table' | 'grid') => {
+const saveViewPreference = (view: 'table' | 'grid' | 'api') => {
     if (typeof window === 'undefined') return;
     localStorage.setItem(getViewStorageKey(), view);
 };
 
-const toggleView = (view: 'table' | 'grid') => {
+const toggleView = (view: 'table' | 'grid' | 'api') => {
     // Save preference to localStorage
     saveViewPreference(view);
 
@@ -123,11 +144,20 @@ const needsViewCheck = computed(() => {
 
     // Check if saved view differs from current
     const saved = localStorage.getItem(`laravilt_view_${props.pageSlug || 'default'}`);
-    if (saved === 'table' || saved === 'grid') {
+    const validViews = props.availableViews || ['table', 'grid'];
+    if (saved && validViews.includes(saved)) {
         return saved !== (props.currentView || 'table');
     }
 
     return false;
+});
+
+// Computed to check if current view is API
+const isApiView = computed(() => props.currentView === 'api');
+
+// Computed to check if we have relation managers to display
+const hasRelationManagers = computed(() => {
+    return props.relationManagers && props.relationManagers.length > 0 && props.record && props.resourceSlug;
 });
 
 // Redirect to saved view preference on mount if needed
@@ -145,6 +175,10 @@ const checkSavedViewPreference = () => {
 const contentRef = ref<HTMLElement | null>(null);
 const vueApps = ref<any[]>([]);
 const formRendererRef = ref<any>(null);
+
+// Page loading state for smooth transitions
+const isPageLoading = ref(true);
+const isPageMounted = ref(false);
 
 // Helper to get form data from formRendererRef (handles array case from v-for)
 const getFormRendererData = () => {
@@ -244,6 +278,24 @@ const hasFormSchema = computed(() => {
         const isGridOrTable = item.columns || item.card;
         return hasFields && !isGridOrTable;
     });
+});
+
+// Check if schema contains InfoList (View pages - should not have internal scroll)
+const hasInfoListSchema = computed(() => {
+    if (!props.schema || !Array.isArray(props.schema)) return false;
+
+    // InfoList pages have fields/schema but NO actions (no submit button)
+    // Unlike form pages which have schemaActions
+    return props.schema.some((item: any) => {
+        const hasFields = item.fields || item.schema;
+        const isGridOrTable = item.columns || item.card;
+        return hasFields && !isGridOrTable;
+    }) && schemaActions.value.length === 0;
+});
+
+// Determine if page should use internal scroll (only for Grid/Table views, not forms or infolists)
+const shouldUseInternalScroll = computed(() => {
+    return !hasFormSchema.value && !hasInfoListSchema.value;
 });
 
 const LayoutComponent = computed(() => {
@@ -501,6 +553,12 @@ function arrayBufferToBase64url(buffer: ArrayBuffer): string {
 onMounted(() => {
     // Check if we should redirect to saved view preference
     checkSavedViewPreference();
+
+    // Mark page as mounted and hide loading after a short delay
+    isPageMounted.value = true;
+    setTimeout(() => {
+        isPageLoading.value = false;
+    }, 100);
 });
 </script>
 
@@ -557,7 +615,7 @@ onMounted(() => {
                         >
                             <ErrorProvider :errors="$page.props.errors || {}">
                                 <!-- Render Schema -->
-                                <SchemaRenderer ref="formRendererRef" :schema="schema" />
+                                <Schema ref="formRendererRef" :schema="schema" :form-controller="formController" />
 
                                 <!-- Submit Actions -->
                                 <div class="flex items-center gap-4">
@@ -581,14 +639,14 @@ onMounted(() => {
                         >
                             <ErrorProvider :errors="errors">
                                 <!-- Render Schema -->
-                                <SchemaRenderer :schema="schema" />
+                                <Schema :schema="schema" :form-controller="formController" />
                             </ErrorProvider>
                         </Form>
 
                         <!-- Bottom Hook -->
                         <component
-                            v-if="bottomHook && typeof bottomHook === 'object'"
-                            :is="bottomHook.component"
+                            v-if="bottomHook && typeof bottomHook === 'object' && hookComponents[bottomHook.component]"
+                            :is="hookComponents[bottomHook.component]"
                             v-bind="bottomHook.props || {}"
                             class="mt-6"
                         />
@@ -605,7 +663,10 @@ onMounted(() => {
         </template>
 
         <template v-else-if="layout === 'panel' || !layout">
-            <div class="flex flex-1 flex-col gap-4 p-4 min-h-0 overflow-hidden max-h-[calc(100vh-4rem)]">
+            <div :class="[
+                'flex flex-1 flex-col gap-4 p-4',
+                shouldUseInternalScroll ? 'min-h-0 overflow-hidden max-h-[calc(100vh-4rem)]' : ''
+            ]">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-shrink-0">
                     <div>
                         <h1 class="text-2xl font-semibold">
@@ -621,12 +682,13 @@ onMounted(() => {
 
                     <!-- Header Actions -->
                     <div class="flex flex-wrap items-center gap-2">
-                        <!-- View Toggle (Table/Grid) -->
+                        <!-- View Toggle (Table/Grid/API) -->
                         <div
                             v-if="hasViewToggle"
                             class="flex items-center rounded-md border bg-muted p-1"
                             data-view-toggle
                         >
+                            <!-- Table View Button (always shown) -->
                             <button
                                 type="button"
                                 @click="toggleView('table')"
@@ -637,6 +699,7 @@ onMounted(() => {
                                         : 'text-muted-foreground hover:text-foreground'
                                 ]"
                                 data-view-toggle-table
+                                title="Table View"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -645,7 +708,9 @@ onMounted(() => {
                                     <line x1="9" y1="3" x2="9" y2="21"/>
                                 </svg>
                             </button>
+                            <!-- Grid View Button (only if grid option is available) -->
                             <button
+                                v-if="hasGridOption"
                                 type="button"
                                 @click="toggleView('grid')"
                                 :class="[
@@ -655,12 +720,35 @@ onMounted(() => {
                                         : 'text-muted-foreground hover:text-foreground'
                                 ]"
                                 data-view-toggle-grid
+                                title="Grid View"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="3" width="7" height="7"/>
                                     <rect x="14" y="3" width="7" height="7"/>
                                     <rect x="14" y="14" width="7" height="7"/>
                                     <rect x="3" y="14" width="7" height="7"/>
+                                </svg>
+                            </button>
+                            <!-- API View Button (only if API option is available) -->
+                            <button
+                                v-if="hasApiOption"
+                                type="button"
+                                @click="toggleView('api')"
+                                :class="[
+                                    'inline-flex items-center justify-center rounded px-3 py-1.5 text-sm font-medium transition-colors',
+                                    currentView === 'api'
+                                        ? 'bg-background text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                ]"
+                                data-view-toggle-api
+                                title="API Tester"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 4h6v6H4z"/>
+                                    <path d="M14 4h6v6h-6z"/>
+                                    <path d="M4 14h6v6H4z"/>
+                                    <path d="M17 14v3a2 2 0 0 1-2 2h-3"/>
+                                    <path d="M14 17l3-3 3 3"/>
                                 </svg>
                             </button>
                         </div>
@@ -682,71 +770,172 @@ onMounted(() => {
                     <div v-if="content" ref="contentRef" v-html="content" />
 
                     <!-- Render Schema (Table/Grid/Form/InfoList) if available -->
-                    <div v-else-if="schema && schema.length" class="flex-1 flex flex-col min-h-0">
+                    <div v-else-if="schema && schema.length" :class="[
+                        'flex-1 flex flex-col',
+                        shouldUseInternalScroll ? 'min-h-0 overflow-y-auto' : ''
+                    ]">
                         <ErrorProvider :errors="$page.props.errors || {}">
-                            <!-- Check if this is a form schema (has fields and actions) -->
-                            <form
-                                v-if="hasFormSchema"
-                                @submit.prevent="handleFormSubmit"
-                                class="space-y-6"
-                            >
-                                <div v-for="(item, index) in schema" :key="index">
-                                    <!-- Render Schema (Form) - skip actions, they're rendered separately -->
-                                    <SchemaRenderer
-                                        v-if="item.fields || item.schema"
-                                        ref="formRendererRef"
-                                        :schema="item.schema || item.fields || []"
-                                        :parent-handles-actions="true"
-                                    />
-                                </div>
-
-                                <!-- Submit Actions for form -->
-                                <div
-                                    v-if="schemaActions && schemaActions.length"
-                                    class="flex items-center gap-4"
-                                >
-                                    <ActionButton
-                                        v-for="action in schemaActions"
-                                        :key="action.name"
-                                        v-bind="action"
-                                        :getFormData="getFormRendererData"
-                                    />
-                                </div>
-                            </form>
-
-                            <!-- Non-form schema (Grid/Table/InfoList) -->
-                            <template v-else>
-                                <!-- Show loading skeleton while redirecting to saved view preference -->
-                                <div v-if="needsViewCheck" class="animate-pulse space-y-4">
-                                    <div class="h-12 bg-muted rounded-lg"></div>
-                                    <div class="h-64 bg-muted rounded-lg"></div>
-                                </div>
-
-                                <div v-else v-for="(item, index) in schema" :key="index" class="h-full flex flex-col">
-                                    <!-- Render Table (handles both table and grid views based on currentView) -->
-                                    <TableRenderer
-                                        v-if="item.columns"
-                                        :table="item"
-                                        :records="item.records || []"
-                                        :pagination="item.pagination"
-                                        :record-actions="item.recordActions || []"
-                                        :bulk-actions="item.bulkActions || []"
-                                        :filter-indicators="item.filterIndicators || []"
-                                        :resource-slug="item.resourceSlug || ''"
-                                        :query-route="item.queryRoute || ''"
-                                        :current-view="currentView || 'table'"
-                                    />
-
-                                    <!-- Render Schema (InfoList - no actions) -->
-                                    <SchemaRenderer
-                                        v-else-if="item.fields || item.schema"
-                                        :schema="item.schema || item.fields || []"
-                                    />
-
-                                    <!-- Fallback for unknown types -->
-                                    <div v-else>
-                                        <pre>{{ item }}</pre>
+                            <!-- Form Schema (Create/Edit pages) -->
+                            <template v-if="hasFormSchema">
+                                <!-- Form Skeleton while loading -->
+                                <div v-if="isPageLoading" class="space-y-6 pb-6 animate-in fade-in duration-150">
+                                    <div class="bg-card rounded-xl border shadow-sm p-6 space-y-6">
+                                        <!-- Section header skeleton -->
+                                        <div class="flex items-center gap-3 pb-4 border-b">
+                                            <div class="h-10 w-10 bg-muted/60 rounded-lg animate-pulse"></div>
+                                            <div class="space-y-2 flex-1">
+                                                <div class="h-4 bg-muted/60 rounded w-1/4 animate-pulse" style="animation-delay: 0ms"></div>
+                                                <div class="h-3 bg-muted/60 rounded w-1/3 animate-pulse" style="animation-delay: 50ms"></div>
+                                            </div>
+                                        </div>
+                                        <!-- Form fields skeleton -->
+                                        <div class="space-y-4">
+                                            <div class="space-y-2">
+                                                <div class="h-4 bg-muted/60 rounded w-20 animate-pulse" style="animation-delay: 75ms"></div>
+                                                <div class="h-10 bg-muted/60 rounded animate-pulse" style="animation-delay: 100ms"></div>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <div class="h-4 bg-muted/60 rounded w-24 animate-pulse" style="animation-delay: 125ms"></div>
+                                                <div class="h-10 bg-muted/60 rounded animate-pulse" style="animation-delay: 150ms"></div>
+                                            </div>
+                                            <div class="space-y-2">
+                                                <div class="h-4 bg-muted/60 rounded w-16 animate-pulse" style="animation-delay: 175ms"></div>
+                                                <div class="h-24 bg-muted/60 rounded animate-pulse" style="animation-delay: 200ms"></div>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <!-- Action button skeleton -->
+                                    <div class="h-10 bg-muted/60 rounded w-32 animate-pulse" style="animation-delay: 225ms"></div>
+                                </div>
+
+                                <!-- Actual Form -->
+                                <form
+                                    v-else
+                                    v-cloak
+                                    @submit.prevent="handleFormSubmit"
+                                    class="space-y-6 pb-6 animate-in fade-in duration-200"
+                                >
+                                    <div v-for="(item, index) in schema" :key="index">
+                                        <!-- Render Schema (Form) - skip actions, they're rendered separately -->
+                                        <Schema
+                                            v-if="item.fields || item.schema"
+                                            ref="formRendererRef"
+                                            :schema="item.schema || item.fields || []"
+                                            :parent-handles-actions="true"
+                                            :form-controller="formController"
+                                        />
+                                    </div>
+
+                                    <!-- Submit Actions for form -->
+                                    <div
+                                        v-if="schemaActions && schemaActions.length"
+                                        class="flex items-center gap-4"
+                                    >
+                                        <ActionButton
+                                            v-for="action in schemaActions"
+                                            :key="action.name"
+                                            v-bind="action"
+                                            :getFormData="getFormRendererData"
+                                        />
+                                    </div>
+
+                                    <!-- Relation Managers (for Edit pages with Form) -->
+                                    <RelationManagers
+                                        v-if="hasRelationManagers"
+                                        :relation-managers="relationManagers"
+                                        :owner-record-id="record?.id"
+                                        :resource-slug="props.resourceSlug"
+                                        :panel-id="panelId || ''"
+                                    />
+                                </form>
+                            </template>
+
+                            <!-- Non-form schema (Grid/Table/InfoList/API) -->
+                            <template v-else>
+                                <!-- InfoList/View Skeleton while loading -->
+                                <div v-if="hasInfoListSchema && isPageLoading" class="space-y-6 animate-in fade-in duration-150">
+                                    <div class="bg-card rounded-xl border shadow-sm">
+                                        <!-- Section header skeleton -->
+                                        <div class="flex items-center gap-3 p-6 border-b">
+                                            <div class="h-10 w-10 bg-muted/60 rounded-lg animate-pulse"></div>
+                                            <div class="space-y-2 flex-1">
+                                                <div class="h-4 bg-muted/60 rounded w-1/4 animate-pulse" style="animation-delay: 0ms"></div>
+                                                <div class="h-3 bg-muted/60 rounded w-1/3 animate-pulse" style="animation-delay: 50ms"></div>
+                                            </div>
+                                        </div>
+                                        <!-- InfoList entries skeleton -->
+                                        <div class="p-6 space-y-4">
+                                            <div class="grid grid-cols-2 gap-4">
+                                                <div class="space-y-2">
+                                                    <div class="h-3 bg-muted/60 rounded w-16 animate-pulse" style="animation-delay: 75ms"></div>
+                                                    <div class="h-5 bg-muted/60 rounded w-3/4 animate-pulse" style="animation-delay: 100ms"></div>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <div class="h-3 bg-muted/60 rounded w-20 animate-pulse" style="animation-delay: 125ms"></div>
+                                                    <div class="h-5 bg-muted/60 rounded w-2/3 animate-pulse" style="animation-delay: 150ms"></div>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <div class="h-3 bg-muted/60 rounded w-14 animate-pulse" style="animation-delay: 175ms"></div>
+                                                    <div class="h-5 bg-muted/60 rounded w-1/2 animate-pulse" style="animation-delay: 200ms"></div>
+                                                </div>
+                                                <div class="space-y-2">
+                                                    <div class="h-3 bg-muted/60 rounded w-18 animate-pulse" style="animation-delay: 225ms"></div>
+                                                    <div class="h-5 bg-muted/60 rounded w-full animate-pulse" style="animation-delay: 250ms"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- View redirect skeleton -->
+                                <div v-else-if="needsViewCheck" class="space-y-4 animate-in fade-in duration-150">
+                                    <div class="h-12 bg-muted/60 rounded-lg animate-pulse"></div>
+                                    <div class="h-64 bg-muted/60 rounded-lg animate-pulse" style="animation-delay: 100ms"></div>
+                                </div>
+
+                                <!-- API View - Render ApiTester component -->
+                                <div v-else-if="isApiView && apiResource" class="h-full flex flex-col animate-in fade-in duration-200">
+                                    <ApiTester :api-resource="apiResource" :api-token="apiToken" />
+                                </div>
+
+                                <!-- Actual content (Table/InfoList) -->
+                                <div v-else v-cloak class="h-full flex flex-col space-y-6 animate-in fade-in duration-200">
+                                    <div v-for="(item, index) in schema" :key="index" class="h-full flex flex-col">
+                                        <!-- Render Table (handles both table and grid views based on currentView) -->
+                                        <Table
+                                            v-if="item.columns"
+                                            :table="item"
+                                            :records="item.records || []"
+                                            :pagination="item.pagination"
+                                            :record-actions="item.recordActions || []"
+                                            :bulk-actions="item.bulkActions || []"
+                                            :filter-indicators="item.filterIndicators || []"
+                                            :resource-slug="item.resourceSlug || ''"
+                                            :query-route="item.queryRoute || ''"
+                                            :current-view="currentView || 'table'"
+                                        />
+
+                                        <!-- Render Schema (InfoList - no actions) -->
+                                        <Schema
+                                            v-else-if="item.fields || item.schema"
+                                            :schema="item.schema || item.fields || []"
+                                            :form-controller="formController"
+                                        />
+
+                                        <!-- Fallback for unknown types -->
+                                        <div v-else>
+                                            <pre>{{ item }}</pre>
+                                        </div>
+                                    </div>
+
+                                    <!-- Relation Managers (for View/Edit pages with InfoList) -->
+                                    <RelationManagers
+                                        v-if="hasRelationManagers && hasInfoListSchema"
+                                        :relation-managers="relationManagers"
+                                        :owner-record-id="record?.id"
+                                        :resource-slug="props.resourceSlug"
+                                        :panel-id="panelId || ''"
+                                    />
                                 </div>
                             </template>
                         </ErrorProvider>
@@ -808,7 +997,7 @@ onMounted(() => {
                 >
                     <ErrorProvider :errors="$page.props.errors || {}">
                         <!-- Render Schema -->
-                        <SchemaRenderer ref="formRendererRef" :schema="schema" />
+                        <Schema ref="formRendererRef" :schema="schema" :form-controller="formController" />
 
                         <!-- Submit Actions -->
                         <div class="flex flex-col gap-4">
@@ -826,63 +1015,63 @@ onMounted(() => {
                             :providers="socialProviders"
                             :redirectUrl="socialRedirectUrl"
                         >
-                            Or continue with
+                            {{ trans('laravilt-auth::auth.social.or_continue_with') }}
                         </SocialLogin>
 
                         <!-- Auth Footer Links -->
                         <div v-if="canRegister && registerUrl" class="text-center text-sm text-muted-foreground">
-                            Don't have an account?
+                            {{ trans('laravilt-auth::auth.login.no_account') }}
                             <Link
                                 :href="registerUrl"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                             >
-                                Sign up
+                                {{ trans('laravilt-auth::auth.login.sign_up') }}
                             </Link>
                         </div>
 
                         <div v-if="canLogin && loginUrl" class="text-center text-sm text-muted-foreground">
-                            Already have an account?
+                            {{ trans('laravilt-auth::auth.register.have_account') }}
                             <Link
                                 :href="loginUrl"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                             >
-                                Sign in
+                                {{ trans('laravilt-auth::auth.register.sign_in') }}
                             </Link>
                         </div>
 
                         <!-- Two-Factor Recovery Code Link -->
                         <div v-if="hasTwoFactorRecovery && recoveryUrl" class="text-center text-sm text-muted-foreground">
-                            Lost your device?
+                            {{ trans('laravilt-auth::auth.two_factor_challenge.lost_device') }}
                             <Link
                                 :href="recoveryUrl"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                             >
-                                Use a recovery code
+                                {{ trans('laravilt-auth::auth.two_factor_challenge.use_recovery') }}
                             </Link>
                         </div>
 
                         <!-- Passkey Authentication Option -->
                         <div v-if="hasPasskeys && passkeyLoginOptionsUrl && passkeyLoginUrl" class="text-center text-sm text-muted-foreground">
-                            or
+                            {{ trans('laravilt-auth::auth.common.or') }}
                             <button
                                 type="button"
                                 @click="handlePasskeyLogin"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                             >
-                                Use a passkey
+                                {{ trans('laravilt-auth::auth.login.use_passkey') }}
                             </button>
                         </div>
 
                         <!-- Magic Link Authentication Option -->
                         <div v-if="hasMagicLinks && magicLinkSendUrl" class="text-center text-sm text-muted-foreground">
-                            or
+                            {{ trans('laravilt-auth::auth.common.or') }}
                             <button
                                 type="button"
                                 @click="handleSendMagicLink"
                                 :disabled="sendingMagicLink"
                                 class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {{ sendingMagicLink ? 'Sending...' : 'Send magic link' }}
+                                {{ sendingMagicLink ? trans('laravilt-auth::auth.common.processing') : trans('laravilt-auth::auth.magic_link.send') }}
                             </button>
                         </div>
                     </ErrorProvider>
@@ -898,14 +1087,14 @@ onMounted(() => {
                 >
                     <ErrorProvider :errors="errors">
                         <!-- Render Schema -->
-                        <SchemaRenderer :schema="schema" />
+                        <Schema :schema="schema" :form-controller="formController" />
                     </ErrorProvider>
                 </Form>
 
                 <!-- Bottom Hook -->
                 <component
-                    v-if="bottomHook && typeof bottomHook === 'object'"
-                    :is="bottomHook.component"
+                    v-if="bottomHook && typeof bottomHook === 'object' && hookComponents[bottomHook.component]"
+                    :is="hookComponents[bottomHook.component]"
                     v-bind="bottomHook.props || {}"
                     class="mt-6"
                 />
