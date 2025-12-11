@@ -27,6 +27,9 @@ class InstallCommand extends Command
         // Publish types
         $this->publishTypes();
 
+        // Publish User model
+        $this->publishUserModel();
+
         // Publish bootstrap files
         $this->publishBootstrap();
 
@@ -157,6 +160,22 @@ class InstallCommand extends Command
                 $this->components->info('Types published');
             } else {
                 $this->components->warn('Skipped types/index.d.ts (already exists)');
+            }
+        }
+    }
+
+    protected function publishUserModel(): void
+    {
+        $stubPath = __DIR__.'/../../stubs/Models/User.php.stub';
+        $targetPath = app_path('Models/User.php');
+
+        if (File::exists($stubPath)) {
+            if ($this->option('force') || $this->confirm('Overwrite app/Models/User.php with LaraviltUser trait?', false)) {
+                $this->copyStub($stubPath, $targetPath);
+                $this->components->info('User model published with LaraviltUser trait');
+            } else {
+                $this->components->warn('Skipped User model (add LaraviltUser trait manually)');
+                $this->components->info('Add this to your User model: use Laravilt\Auth\Concerns\LaraviltUser;');
             }
         }
     }
