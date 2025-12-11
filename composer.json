@@ -1,13 +1,16 @@
 {
     "name": "laravilt/panel",
-    "description": "plugin for Laravilt",
-    "version": "1.0.7",
+    "description": "A powerful admin panel framework for Laravel with Vue.js (Inertia.js) frontend. Build beautiful, reactive admin panels with minimal effort.",
+    "version": "1.0.0",
     "type": "library",
     "license": "MIT",
     "keywords": [
         "laravel",
         "laravilt",
-        "plugin"
+        "plugin",
+        "panel",
+        "admin",
+        "dashboard"
     ],
     "authors": [
         {
