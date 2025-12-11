@@ -1,6 +1,6 @@
 {
     "name": "@laravilt/panel",
-    "version": "1.0.3",
+    "version": "1.0.0",
     "description": "Complete admin panel system with resources, pages, navigation, multi-tenancy, and customizable layouts. Build powerful admin interfaces with CRUD resources, custom pages, and multiple panels.",
     "author": "Fady Mondy <info@3x1.io>",
     "license": "MIT",
