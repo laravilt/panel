@@ -21,6 +21,12 @@ class InstallCommand extends Command
         // Publish layouts
         $this->publishLayouts();
 
+        // Publish components
+        $this->publishComponents();
+
+        // Publish types
+        $this->publishTypes();
+
         // Publish bootstrap files
         $this->publishBootstrap();
 
@@ -116,6 +122,43 @@ class InstallCommand extends Command
             base_path('routes/settings.php')
         );
         $this->components->info('Route settings.php published');
+    }
+
+    protected function publishComponents(): void
+    {
+        $components = [
+            'AppSidebarHeader.vue',
+            'NavUser.vue',
+            'UserMenuContent.vue',
+        ];
+
+        foreach ($components as $component) {
+            $stubPath = __DIR__."/../../stubs/components/{$component}.stub";
+            $targetPath = resource_path("js/components/{$component}");
+
+            if (File::exists($stubPath)) {
+                if (! File::exists($targetPath) || $this->option('force')) {
+                    $this->copyStub($stubPath, $targetPath);
+                }
+            }
+        }
+
+        $this->components->info('Components published');
+    }
+
+    protected function publishTypes(): void
+    {
+        $stubPath = __DIR__.'/../../stubs/types/index.d.ts.stub';
+        $targetPath = resource_path('js/types/index.d.ts');
+
+        if (File::exists($stubPath)) {
+            if (! File::exists($targetPath) || $this->option('force')) {
+                $this->copyStub($stubPath, $targetPath);
+                $this->components->info('Types published');
+            } else {
+                $this->components->warn('Skipped types/index.d.ts (already exists)');
+            }
+        }
     }
 
     protected function copyStub(string $from, string $to): void

@@ -7,14 +7,14 @@ import Table from '@laravilt/tables/components/Table.vue';
 import ApiTester from '@laravilt/tables/components/ApiTester.vue';
 import SocialLogin from '@laravilt/auth/components/SocialLogin.vue';
 import OtpResendHook from '@laravilt/auth/components/OtpResendHook.vue';
-import RelationManagers from '../../components/RelationManagers.vue';
+import RelationManagers from '@laravilt/panel/components/RelationManagers.vue';
 import { useLocalization } from '@laravilt/support/composables';
 import { computed, onMounted, ref, markRaw, watch } from 'vue';
 
 const { trans } = useLocalization();
-import CardLayout from '../../layouts/CardLayout.vue';
-import PanelLayout from '../../layouts/PanelLayout.vue';
-import SettingsLayout from '../../layouts/SettingsLayout.vue';
+import CardLayout from '@laravilt/panel/layouts/CardLayout.vue';
+import PanelLayout from '@laravilt/panel/layouts/PanelLayout.vue';
+import SettingsLayout from '@laravilt/panel/layouts/SettingsLayout.vue';
 
 // Mark layout components as raw to prevent Vue from making them reactive
 // This helps with persistent layouts performance

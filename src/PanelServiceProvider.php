@@ -36,6 +36,16 @@ class PanelServiceProvider extends ServiceProvider
             __DIR__.'/../lang' => lang_path('vendor/laravilt-panel'),
         ], 'laravilt-panel-lang');
 
+        // Publish frontend views/pages
+        $this->publishes([
+            __DIR__.'/../resources/js/pages/laravilt' => resource_path('js/pages/laravilt'),
+        ], 'laravilt-panel-views');
+
+        // Publish frontend components
+        $this->publishes([
+            __DIR__.'/../resources/js/components' => resource_path('js/components/laravilt'),
+        ], 'laravilt-panel-assets');
+
         // Register panel's custom Authenticate middleware as 'panel.auth' alias
         $router = $this->app->make(\Illuminate\Routing\Router::class);
         $router->aliasMiddleware('panel.auth', Http\Middleware\Authenticate::class);

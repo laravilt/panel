@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3'
-import ManageRecordsComponent from '../../components/ManageRecords.vue'
-import PanelLayout from '../../layouts/PanelLayout.vue'
+import ManageRecordsComponent from '@laravilt/panel/components/ManageRecords.vue'
+import PanelLayout from '@laravilt/panel/layouts/PanelLayout.vue'
 import { computed, markRaw } from 'vue'
 
 const PanelLayoutRaw = markRaw(PanelLayout)

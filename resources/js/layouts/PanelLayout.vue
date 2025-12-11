@@ -22,8 +22,8 @@ withDefaults(defineProps<Props>(), {
 
 // Get shared panel data from Inertia
 const page = usePage();
-const panelData = computed(() => page.props.panel as any);
-const user = computed(() => page.props.auth?.user as any);
+const panelData = computed(() => (page.props?.panel ?? {}) as any);
+const user = computed(() => page.props?.auth?.user as any);
 
 // Panel Font Loading
 const loadPanelFont = () => {

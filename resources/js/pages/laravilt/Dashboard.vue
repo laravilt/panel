@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head } from '@inertiajs/vue3';
 import { computed, markRaw } from 'vue';
-import PanelLayout from '../../layouts/PanelLayout.vue';
+import PanelLayout from '@laravilt/panel/layouts/PanelLayout.vue';
 import WidgetRenderer from '@laravilt/widgets/components/WidgetRenderer.vue';
 
 const PanelLayoutRaw = markRaw(PanelLayout);
