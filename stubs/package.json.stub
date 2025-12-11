@@ -55,8 +55,6 @@
         "@laravilt/notifications": "npm:@laravilt/notifications@^1.0",
         "@laravilt/schemas": "npm:@laravilt/schemas@^1.0",
         "@laravilt/support": "npm:@laravilt/support@^1.0",
-        "@laravilt/tables": "npm:@laravilt/tables@^1.0",
-        "@laravilt/widgets": "npm:@laravilt/widgets@^1.0",
         "@tiptap/extension-color": "^3.11.0",
         "@tiptap/extension-highlight": "^3.11.0",
         "@tiptap/extension-horizontal-rule": "^3.11.0",
@@ -96,7 +94,8 @@
         "tailwindcss": "^4.1.1",
         "tw-animate-css": "^1.2.5",
         "vue": "^3.5.13",
-        "vue-filepond": "^7.0.4"
+        "vue-filepond": "^7.0.4",
+        "vue-input-otp": "^0.3.2"
     },
     "optionalDependencies": {
         "@rollup/rollup-linux-x64-gnu": "4.9.5",

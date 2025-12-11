@@ -16,6 +16,11 @@ class {{ studlyId }}PanelProvider extends PanelProvider
             ->path('{{ path }}')
             ->brandName('{{ studlyId }}')
             ->discoverAutomatically()
+            ->login()
+            ->registration()
+            ->profile()
+            ->sessionManagement()
+            ->localeTimezone()
             ->middleware(['web', 'auth'])
             ->authMiddleware(['auth']);
     }

@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 
+use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\text;
+
 class MakePanelCommand extends Command
 {
     protected $signature = 'laravilt:panel
@@ -17,19 +21,79 @@ class MakePanelCommand extends Command
     protected $description = 'Create a new panel with interactive feature selection';
 
     /**
+     * Selected two-factor providers.
+     */
+    protected array $twoFactorProviders = [];
+
+    /**
+     * Selected social login providers.
+     */
+    protected array $socialProviders = [];
+
+    /**
+     * Selected AI model.
+     */
+    protected string $aiModel = 'GPT_4O_MINI';
+
+    /**
      * Available features for panels.
      */
     protected array $availableFeatures = [
+        // Authentication
         'login' => 'Login page',
         'registration' => 'User registration',
-        'password-reset' => 'Password reset functionality',
+        'password-reset' => 'Password reset',
         'email-verification' => 'Email verification',
-        'profile' => 'User profile management',
+        'otp' => 'OTP authentication',
+        'magic-links' => 'Magic link login',
+
+        // Security
         'two-factor' => 'Two-factor authentication (2FA)',
         'passkeys' => 'Passkey authentication (WebAuthn)',
-        'social-login' => 'Social login (OAuth providers)',
+        'session-management' => 'Session management',
+
+        // User Management
+        'profile' => 'User profile management',
+        'social-login' => 'Social login (OAuth)',
+        'connected-accounts' => 'Connected accounts',
+        'api-tokens' => 'API tokens',
+
+        // Features
         'database-notifications' => 'Database notifications',
-        'browser-sessions' => 'Browser session management',
+        'locale-timezone' => 'Locale & timezone settings',
+        'global-search' => 'Global search',
+        'ai-providers' => 'AI assistant',
+    ];
+
+    /**
+     * Available two-factor providers.
+     */
+    protected array $availableTwoFactorProviders = [
+        'totp' => 'TOTP (Authenticator App)',
+        'email' => 'Email verification code',
+    ];
+
+    /**
+     * Available social login providers.
+     */
+    protected array $availableSocialProviders = [
+        'google' => 'Google',
+        'github' => 'GitHub',
+        'facebook' => 'Facebook',
+        'twitter' => 'Twitter/X',
+        'linkedin' => 'LinkedIn',
+        'discord' => 'Discord',
+        'jira' => 'Jira',
+    ];
+
+    /**
+     * Available AI models.
+     */
+    protected array $availableAIModels = [
+        'GPT_4O_MINI' => 'GPT-4o Mini (Recommended)',
+        'GPT_4O' => 'GPT-4o',
+        'GPT_4_TURBO' => 'GPT-4 Turbo',
+        'GPT_3_5_TURBO' => 'GPT-3.5 Turbo',
     ];
 
     /**
@@ -37,12 +101,14 @@ class MakePanelCommand extends Command
      */
     public function handle(): int
     {
-        $id = $this->argument('id');
-
-        // If no ID provided, ask for it
-        if (! $id) {
-            $id = $this->ask('What is the panel identifier?', 'admin');
-        }
+        // Get panel ID
+        $id = $this->argument('id') ?? text(
+            label: 'What is the panel identifier?',
+            placeholder: 'admin',
+            default: 'admin',
+            required: true,
+            hint: 'This will be used for the URL path and provider name'
+        );
 
         $path = $this->option('path') ?? $id;
         $studlyId = Str::studly($id);
@@ -55,6 +121,16 @@ class MakePanelCommand extends Command
         $features = $this->option('quick')
             ? $this->getDefaultFeatures()
             : $this->selectFeatures();
+
+        // Ask for provider options based on selected features
+        if (! $this->option('quick')) {
+            $this->askForProviderOptions($features);
+        } else {
+            // Set defaults for quick mode
+            $this->twoFactorProviders = ['totp', 'email'];
+            $this->socialProviders = ['google', 'github'];
+            $this->aiModel = 'GPT_4O_MINI';
+        }
 
         // Create panel provider
         $this->createPanelProvider($studlyId, $id, $path, $features);
@@ -91,10 +167,10 @@ class MakePanelCommand extends Command
             );
         }
 
-        // Run optimize to clear and rebuild caches
+        // Clear caches (don't rebuild as closures can't be serialized)
         $this->newLine();
-        $this->components->task('Rebuilding caches', function () {
-            Artisan::call('optimize');
+        $this->components->task('Clearing caches', function () {
+            Artisan::call('optimize:clear');
 
             return true;
         });
@@ -115,43 +191,86 @@ class MakePanelCommand extends Command
     }
 
     /**
-     * Interactive feature selection.
+     * Interactive feature selection using Laravel Prompts multiselect.
      */
     protected function selectFeatures(): array
     {
-        $this->components->info('Select the features you want to enable for this panel:');
-        $this->newLine();
+        $options = [];
 
-        $selectedFeatures = [];
+        // Authentication features
+        $options['login'] = 'Login page';
+        $options['registration'] = 'User registration';
+        $options['password-reset'] = 'Password reset';
+        $options['email-verification'] = 'Email verification';
+        $options['otp'] = 'OTP authentication';
+        $options['magic-links'] = 'Magic link login';
 
-        // Group features for better UX
-        $featureGroups = [
-            'Authentication' => ['login', 'registration', 'password-reset', 'email-verification'],
-            'Security' => ['two-factor', 'passkeys', 'browser-sessions'],
-            'User Management' => ['profile', 'social-login'],
-            'Notifications' => ['database-notifications'],
-        ];
+        // Security features
+        $options['two-factor'] = 'Two-factor authentication (2FA)';
+        $options['passkeys'] = 'Passkey authentication (WebAuthn)';
+        $options['session-management'] = 'Session management';
 
-        foreach ($featureGroups as $groupName => $groupFeatures) {
-            $this->components->info($groupName);
+        // User Management features
+        $options['profile'] = 'User profile management';
+        $options['social-login'] = 'Social login (OAuth providers)';
+        $options['connected-accounts'] = 'Connected accounts';
+        $options['api-tokens'] = 'API tokens';
 
-            foreach ($groupFeatures as $feature) {
-                if (! isset($this->availableFeatures[$feature])) {
-                    continue;
-                }
+        // Additional features
+        $options['database-notifications'] = 'Database notifications';
+        $options['locale-timezone'] = 'Locale & timezone settings';
+        $options['global-search'] = 'Global search';
+        $options['ai-providers'] = 'AI assistant';
 
-                $default = in_array($feature, ['login', 'password-reset', 'profile']);
-                $label = $this->availableFeatures[$feature];
+        return multiselect(
+            label: 'Which features would you like to enable?',
+            options: $options,
+            default: ['login', 'password-reset', 'profile'],
+            required: false,
+            hint: 'Use space to select, enter to confirm',
+            scroll: 12
+        );
+    }
 
-                if ($this->confirm("  Enable {$label}?", $default)) {
-                    $selectedFeatures[] = $feature;
-                }
-            }
-
+    /**
+     * Ask for provider options based on selected features.
+     */
+    protected function askForProviderOptions(array $features): void
+    {
+        // Two-factor providers
+        if (in_array('two-factor', $features)) {
             $this->newLine();
+            $this->twoFactorProviders = multiselect(
+                label: 'Which 2FA providers would you like to enable?',
+                options: $this->availableTwoFactorProviders,
+                default: ['totp', 'email'],
+                required: true,
+                hint: 'At least one provider is required for 2FA'
+            );
         }
 
-        return $selectedFeatures;
+        // Social login providers
+        if (in_array('social-login', $features)) {
+            $this->newLine();
+            $this->socialProviders = multiselect(
+                label: 'Which social login providers would you like to enable?',
+                options: $this->availableSocialProviders,
+                default: ['google', 'github'],
+                required: true,
+                hint: 'Select the OAuth providers you want to support'
+            );
+        }
+
+        // AI model selection
+        if (in_array('ai-providers', $features)) {
+            $this->newLine();
+            $this->aiModel = select(
+                label: 'Which AI model would you like to use?',
+                options: $this->availableAIModels,
+                default: 'GPT_4O_MINI',
+                hint: 'GPT-4o Mini is recommended for most use cases'
+            );
+        }
     }
 
     /**
@@ -174,16 +293,16 @@ class MakePanelCommand extends Command
      */
     protected function generatePanelProviderContent(string $studlyId, string $id, string $path, array $features): string
     {
+        $imports = $this->buildImports($features);
         $authFeatures = $this->buildAuthFeatures($features);
         $middleware = $this->buildMiddleware($features);
-        $additionalMethods = $this->buildAdditionalMethods($features);
 
         $content = <<<PHP
 <?php
 
 namespace App\Providers\Laravilt;
 
-use Laravilt\Panel\Panel;
+{$imports}use Laravilt\Panel\Panel;
 use Laravilt\Panel\PanelProvider;
 
 class {$studlyId}PanelProvider extends PanelProvider
@@ -200,11 +319,79 @@ class {$studlyId}PanelProvider extends PanelProvider
             ->discoverAutomatically()
 {$authFeatures}{$middleware};
     }
-{$additionalMethods}}
+}
 
 PHP;
 
         return $content;
+    }
+
+    /**
+     * Build imports based on selected features.
+     */
+    protected function buildImports(array $features): string
+    {
+        $imports = [];
+
+        // Two-factor imports
+        if (in_array('two-factor', $features) && ! empty($this->twoFactorProviders)) {
+            $imports[] = 'use Laravilt\Auth\Builders\TwoFactorProviderBuilder;';
+
+            if (in_array('totp', $this->twoFactorProviders)) {
+                $imports[] = 'use Laravilt\Auth\Drivers\TotpDriver;';
+            }
+            if (in_array('email', $this->twoFactorProviders)) {
+                $imports[] = 'use Laravilt\Auth\Drivers\EmailDriver;';
+            }
+        }
+
+        // Social login imports
+        if (in_array('social-login', $features) && ! empty($this->socialProviders)) {
+            $imports[] = 'use Laravilt\Auth\Builders\SocialProviderBuilder;';
+
+            foreach ($this->socialProviders as $provider) {
+                $providerClass = $this->getSocialProviderClass($provider);
+                $imports[] = "use Laravilt\\Auth\\Drivers\\SocialProviders\\{$providerClass};";
+            }
+        }
+
+        // Global search imports
+        if (in_array('global-search', $features)) {
+            $imports[] = 'use Laravilt\AI\Builders\GlobalSearchBuilder;';
+        }
+
+        // AI providers imports
+        if (in_array('ai-providers', $features)) {
+            $imports[] = 'use Laravilt\AI\Builders\AIProviderBuilder;';
+            $imports[] = 'use Laravilt\AI\Providers\OpenAIProvider;';
+            $imports[] = 'use Laravilt\AI\Enums\OpenAIModel;';
+        }
+
+        if (empty($imports)) {
+            return '';
+        }
+
+        // Sort imports for cleaner code
+        sort($imports);
+
+        return implode("\n", $imports)."\n";
+    }
+
+    /**
+     * Get social provider class name.
+     */
+    protected function getSocialProviderClass(string $provider): string
+    {
+        return match ($provider) {
+            'google' => 'GoogleProvider',
+            'github' => 'GitHubProvider',
+            'facebook' => 'FacebookProvider',
+            'twitter' => 'TwitterProvider',
+            'linkedin' => 'LinkedInProvider',
+            'discord' => 'DiscordProvider',
+            'jira' => 'JiraProvider',
+            default => Str::studly($provider).'Provider',
+        };
     }
 
     /**
@@ -230,31 +417,130 @@ PHP;
             $methods[] = '            ->emailVerification()';
         }
 
+        if (in_array('otp', $features)) {
+            $methods[] = '            ->otp()';
+        }
+
+        if (in_array('magic-links', $features)) {
+            $methods[] = '            ->magicLinks()';
+        }
+
         if (in_array('profile', $features)) {
             $methods[] = '            ->profile()';
         }
 
-        if (in_array('two-factor', $features)) {
-            $methods[] = '            ->twoFactorAuthentication()';
+        if (in_array('two-factor', $features) && ! empty($this->twoFactorProviders)) {
+            $methods[] = $this->buildTwoFactorMethod();
         }
 
         if (in_array('passkeys', $features)) {
             $methods[] = '            ->passkeys()';
         }
 
-        if (in_array('social-login', $features)) {
-            $methods[] = "            ->socialLogin(['google', 'github'])";
+        if (in_array('social-login', $features) && ! empty($this->socialProviders)) {
+            $methods[] = $this->buildSocialLoginMethod();
         }
 
-        if (in_array('browser-sessions', $features)) {
-            $methods[] = '            ->browserSessions()';
+        if (in_array('connected-accounts', $features)) {
+            $methods[] = '            ->connectedAccounts()';
+        }
+
+        if (in_array('session-management', $features)) {
+            $methods[] = '            ->sessionManagement()';
+        }
+
+        if (in_array('api-tokens', $features)) {
+            $methods[] = '            ->apiTokens()';
         }
 
         if (in_array('database-notifications', $features)) {
             $methods[] = '            ->databaseNotifications()';
         }
 
+        if (in_array('locale-timezone', $features)) {
+            $methods[] = '            ->localeTimezone()';
+        }
+
+        if (in_array('global-search', $features)) {
+            $methods[] = $this->buildGlobalSearchMethod();
+        }
+
+        if (in_array('ai-providers', $features)) {
+            $methods[] = $this->buildAIProvidersMethod();
+        }
+
         return empty($methods) ? '' : implode("\n", $methods)."\n";
+    }
+
+    /**
+     * Build two-factor method with selected providers.
+     */
+    protected function buildTwoFactorMethod(): string
+    {
+        $providers = [];
+
+        foreach ($this->twoFactorProviders as $provider) {
+            $driverClass = match ($provider) {
+                'totp' => 'TotpDriver',
+                'email' => 'EmailDriver',
+                default => Str::studly($provider).'Driver',
+            };
+            $providers[] = "                \$builder->provider({$driverClass}::class);";
+        }
+
+        $providersCode = implode("\n", $providers);
+
+        return <<<PHP
+            ->twoFactor(builder: function (TwoFactorProviderBuilder \$builder) {
+{$providersCode}
+            })
+PHP;
+    }
+
+    /**
+     * Build social login method with selected providers.
+     */
+    protected function buildSocialLoginMethod(): string
+    {
+        $providers = [];
+
+        foreach ($this->socialProviders as $provider) {
+            $providerClass = $this->getSocialProviderClass($provider);
+            $providers[] = "                \$builder->provider({$providerClass}::class, fn ({$providerClass} \$p) => \$p->enabled());";
+        }
+
+        $providersCode = implode("\n", $providers);
+
+        return <<<PHP
+            ->socialLogin(function (SocialProviderBuilder \$builder) {
+{$providersCode}
+            })
+PHP;
+    }
+
+    /**
+     * Build global search method.
+     */
+    protected function buildGlobalSearchMethod(): string
+    {
+        return <<<'PHP'
+            ->globalSearch(function (GlobalSearchBuilder $search) {
+                $search->enabled()->limit(5)->debounce(300);
+            })
+PHP;
+    }
+
+    /**
+     * Build AI providers method with selected model.
+     */
+    protected function buildAIProvidersMethod(): string
+    {
+        return <<<PHP
+            ->aiProviders(function (AIProviderBuilder \$ai) {
+                \$ai->provider(OpenAIProvider::class, fn (OpenAIProvider \$p) => \$p->model(OpenAIModel::{$this->aiModel}))
+                   ->default('openai');
+            })
+PHP;
     }
 
     /**
@@ -266,14 +552,6 @@ PHP;
         $middleware .= "            ->authMiddleware(['auth'])";
 
         return $middleware;
-    }
-
-    /**
-     * Build additional methods (widgets, navigation, etc).
-     */
-    protected function buildAdditionalMethods(array $features): string
-    {
-        return '';
     }
 
     /**
@@ -396,8 +674,7 @@ PHP;
         // Setup for two-factor authentication
         if (in_array('two-factor', $features)) {
             $this->components->task('Setting up two-factor authentication', function () {
-                // Ensure Fortify 2FA is enabled
-                // This is typically done via config, but we can remind the user
+                // Ensure Fortify 2FA columns exist
                 return true;
             });
         }

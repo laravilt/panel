@@ -20,15 +20,15 @@ createInertiaApp({
     resolve: async (name) => {
         // Try to resolve from app pages first
         const appPages = import.meta.glob<DefineComponent>('./pages/**/*.vue');
-        const panelPages = import.meta.glob<DefineComponent>('../vendor/laravilt/panel/resources/js/pages/**/*.vue');
-        const authPages = import.meta.glob<DefineComponent>('../vendor/laravilt/auth/resources/js/Pages/**/*.vue');
-        const aiPages = import.meta.glob<DefineComponent>('../vendor/laravilt/ai/resources/js/Pages/**/*.vue');
+        const panelPages = import.meta.glob<DefineComponent>('../../vendor/laravilt/panel/resources/js/pages/**/*.vue');
+        const authPages = import.meta.glob<DefineComponent>('../../vendor/laravilt/auth/resources/js/Pages/**/*.vue');
+        const aiPages = import.meta.glob<DefineComponent>('../../vendor/laravilt/ai/resources/js/Pages/**/*.vue');
 
         // Handle laravilt-auth/ prefix
         if (name.startsWith('laravilt-auth/')) {
             const authPageName = name.replace('laravilt-auth/', '');
             return await resolvePageComponent(
-                `../vendor/laravilt/auth/resources/js/Pages/${authPageName}.vue`,
+                `../../vendor/laravilt/auth/resources/js/Pages/${authPageName}.vue`,
                 authPages,
             );
         }
@@ -42,20 +42,20 @@ createInertiaApp({
             // If not found in app pages, try panel pages
             try {
                 return await resolvePageComponent(
-                    `../vendor/laravilt/panel/resources/js/pages/${name}.vue`,
+                    `../../vendor/laravilt/panel/resources/js/pages/${name}.vue`,
                     panelPages,
                 );
             } catch (e2) {
                try {
                    // If not found in panel pages, try auth pages
                    return await resolvePageComponent(
-                       `../vendor/laravilt/auth/resources/js/Pages/${name}.vue`,
+                       `../../vendor/laravilt/auth/resources/js/Pages/${name}.vue`,
                        authPages,
                    );
                } catch (e3) {
                    // If not found in auth pages, try ai pages
                    return await resolvePageComponent(
-                       `../vendor/laravilt/ai/resources/js/Pages/${name}.vue`,
+                       `../../vendor/laravilt/ai/resources/js/Pages/${name}.vue`,
                        aiPages,
                    );
                }

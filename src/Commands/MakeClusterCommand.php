@@ -24,9 +24,9 @@ class MakeClusterCommand extends GeneratorCommand
         $result = parent::handle();
 
         if ($result !== false) {
-            // Run optimize to clear and rebuild caches
-            $this->components->info('Running optimize to rebuild caches...');
-            $this->call('optimize');
+            // Clear caches (don't rebuild as closures can't be serialized)
+            $this->components->info('Clearing caches...');
+            $this->call('optimize:clear');
         }
 
         return $result;

@@ -277,6 +277,8 @@ class MakeResourceCommand extends Command
 
     protected bool $useApiTester = false;
 
+    protected array $tableFeatures = [];
+
     /**
      * Field name patterns for intelligent input type selection
      */
@@ -570,6 +572,24 @@ class MakeResourceCommand extends Command
             );
         }
 
+        // Ask about table features
+        $this->tableFeatures = multiselect(
+            label: 'Select table features:',
+            options: [
+                'card' => 'Grid/Card layout - Display records as cards',
+                'striped' => 'Striped rows - Alternating row colors',
+                'hoverable' => 'Hoverable rows - Highlight on hover',
+                'reorderable' => 'Reorderable - Drag to reorder records',
+                'pagination' => 'Pagination - Split into pages',
+                'searchable' => 'Global search - Search all columns',
+                'infinite-scroll' => 'Infinite scroll - Load more on scroll',
+                'polling' => 'Auto-refresh - Poll every 30 seconds',
+                'fixed-actions' => 'Fixed actions - Sticky action column',
+            ],
+            default: ['pagination', 'searchable'],
+            hint: 'Use space to select, enter to confirm'
+        );
+
         // Confirm generation
         $this->newLine();
         $this->components->info('Will generate:');
@@ -614,7 +634,7 @@ class MakeResourceCommand extends Command
         // Generate all files
         $this->createResourceFile($panel, $modelName, $tableName, $resourceDir, $this->isSimple, $hasSoftDeletes);
         $this->createFormFile($panel, $modelName, $columns, $resourceDir);
-        $this->createTableFile($panel, $modelName, $columns, $resourceDir, $hasSoftDeletes);
+        $this->createTableFile($panel, $modelName, $columns, $resourceDir, $hasSoftDeletes, $this->tableFeatures);
         $this->createInfoListFile($panel, $modelName, $columns, $resourceDir);
         $this->createPageFiles($panel, $modelName, $resourceDir, $this->isSimple);
 
@@ -639,10 +659,10 @@ class MakeResourceCommand extends Command
             $this->line("  API: app/Laravilt/{$panel}/Resources/{$modelName}/Api/{$modelName}Api.php");
         }
 
-        // Run optimize to clear and rebuild caches
+        // Clear caches (don't rebuild as closures can't be serialized)
         $this->newLine();
-        $this->components->info('Running optimize to rebuild caches...');
-        $this->call('optimize');
+        $this->components->info('Clearing caches...');
+        $this->call('optimize:clear');
 
         return self::SUCCESS;
     }
@@ -1186,7 +1206,7 @@ PHP;
         return implode("\n\n", $sections);
     }
 
-    protected function createTableFile(string $panel, string $modelName, array $columns, string $dir, bool $hasSoftDeletes = false): void
+    protected function createTableFile(string $panel, string $modelName, array $columns, string $dir, bool $hasSoftDeletes = false, array $tableFeatures = []): void
     {
         $tableColumns = $this->generateTableColumns($columns);
         $tableImports = $this->generateTableImports($columns);
@@ -1218,6 +1238,12 @@ PHP;
 PHP;
         }
 
+        // Card import if card feature is selected
+        $cardImport = in_array('card', $tableFeatures) ? "use Laravilt\\Tables\\Card;\n" : '';
+
+        // Build table feature methods
+        $featureMethods = $this->buildTableFeatureMethods($tableFeatures);
+
         $content = <<<PHP
 <?php
 
@@ -1230,7 +1256,7 @@ use Laravilt\Actions\EditAction;
 use Laravilt\Actions\ViewAction;
 {$softDeleteImports}
 {$tableImports}
-use Laravilt\Tables\Table;
+{$cardImport}use Laravilt\Tables\Table;
 
 class {$modelName}Table
 {
@@ -1253,12 +1279,63 @@ class {$modelName}Table
                     DeleteBulkAction::make(),{$softDeleteBulkActions}
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'){$featureMethods};
     }
 }
 PHP;
 
         File::put("{$dir}/Table/{$modelName}Table.php", $content);
+    }
+
+    /**
+     * Build table feature methods based on selected features.
+     */
+    protected function buildTableFeatureMethods(array $features): string
+    {
+        $methods = [];
+
+        if (in_array('card', $features)) {
+            $methods[] = '->card(Card::simple(\'name\', \'description\'))';
+            $methods[] = '->cardsPerRow(3)';
+        }
+
+        if (in_array('striped', $features)) {
+            $methods[] = '->striped()';
+        }
+
+        if (in_array('hoverable', $features)) {
+            $methods[] = '->hoverable()';
+        }
+
+        if (in_array('reorderable', $features)) {
+            $methods[] = '->reorderable(\'sort_order\')';
+        }
+
+        if (in_array('pagination', $features)) {
+            $methods[] = '->paginated([10, 25, 50, 100])';
+        }
+
+        if (in_array('searchable', $features)) {
+            $methods[] = '->searchable()';
+        }
+
+        if (in_array('infinite-scroll', $features)) {
+            $methods[] = '->infiniteScroll()';
+        }
+
+        if (in_array('polling', $features)) {
+            $methods[] = '->poll(\'30s\')';
+        }
+
+        if (in_array('fixed-actions', $features)) {
+            $methods[] = '->fixActions()';
+        }
+
+        if (empty($methods)) {
+            return '';
+        }
+
+        return "\n            ".implode("\n            ", $methods);
     }
 
     protected function createInfoListFile(string $panel, string $modelName, array $columns, string $dir): void

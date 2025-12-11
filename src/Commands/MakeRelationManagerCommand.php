@@ -131,10 +131,10 @@ class MakeRelationManagerCommand extends Command
         $this->line('      ];');
         $this->line('  }');
 
-        // Run optimize to clear and rebuild caches
+        // Clear caches (don't rebuild as closures can't be serialized)
         $this->newLine();
-        $this->components->info('Running optimize to rebuild caches...');
-        $this->call('optimize');
+        $this->components->info('Clearing caches...');
+        $this->call('optimize:clear');
 
         return self::SUCCESS;
     }
