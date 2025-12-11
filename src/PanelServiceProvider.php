@@ -1081,7 +1081,6 @@ class PanelServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                Commands\InstallCommand::class,
                 Commands\MakePanelCommand::class,
                 Commands\MakePageCommand::class,
                 Commands\MakeResourceCommand::class,
