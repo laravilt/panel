@@ -27,10 +27,10 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js for npm
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
@@ -42,7 +42,7 @@ jobs:
           echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps --ignore-scripts
 
       - name: Bump version (if manual trigger)
         if: github.event_name == 'workflow_dispatch'

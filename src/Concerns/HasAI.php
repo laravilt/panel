@@ -129,31 +129,48 @@ trait HasAI
      */
     protected function registerAIRoutes(): void
     {
-        if (! $this->hasGlobalSearch()) {
-            return;
-        }
-
         $panelPath = $this->getPath();
         $panelId = $this->getId();
+
+        // Build the full middleware stack (same as panel routes)
         $middleware = $this->getMiddleware();
+        $authMiddleware = $this->getAuthMiddleware();
 
-        // Register global search route
-        \Illuminate\Support\Facades\Route::middleware($middleware)
-            ->prefix($panelPath)
-            ->name($panelId.'.')
-            ->group(function () {
-                $controller = \Laravilt\AI\Http\Controllers\GlobalSearchController::class;
+        // Replace 'auth' with 'panel.auth' in middleware arrays
+        $middleware = array_map(fn ($m) => $m === 'auth' ? 'panel.auth' : $m, $middleware);
+        $authMiddleware = array_map(fn ($m) => $m === 'auth' ? 'panel.auth' : $m, $authMiddleware);
 
-                \Illuminate\Support\Facades\Route::get('/global-search', [$controller, 'search'])->name('global-search');
-                \Illuminate\Support\Facades\Route::get('/global-search/resources', [$controller, 'resources'])->name('global-search.resources');
-            });
+        // Remove panel.auth from base middleware to ensure correct order
+        $middlewareWithoutAuth = array_filter($middleware, fn ($m) => $m !== 'panel.auth');
+
+        // Full middleware stack with panel identification, auth, localization and data sharing
+        $fullMiddleware = array_merge(
+            $middlewareWithoutAuth,
+            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$panelId],
+            $authMiddleware,
+            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
+            [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
+        );
+
+        // Register global search route if enabled
+        if ($this->hasGlobalSearch()) {
+            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
+                ->prefix($panelPath)
+                ->name($panelId.'.')
+                ->group(function () {
+                    $controller = \Laravilt\AI\Http\Controllers\GlobalSearchController::class;
+
+                    \Illuminate\Support\Facades\Route::get('/global-search', [$controller, 'search'])->name('global-search');
+                    \Illuminate\Support\Facades\Route::get('/global-search/resources', [$controller, 'resources'])->name('global-search.resources');
+                });
+        }
 
         // Register AI routes if providers are configured
         if ($this->hasAIProviders()) {
             $panel = $this;
 
             // Register AI Chat page route
-            \Illuminate\Support\Facades\Route::middleware($middleware)
+            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
                 ->prefix($panelPath)
                 ->name($panelId.'.')
                 ->group(function () use ($panel) {
@@ -168,13 +185,14 @@ trait HasAI
                 });
 
             // Register AI API routes
-            \Illuminate\Support\Facades\Route::middleware($middleware)
+            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
                 ->prefix($panelPath.'/ai')
                 ->name($panelId.'.ai.')
                 ->group(function () {
                     $controller = \Laravilt\AI\Http\Controllers\AIController::class;
 
                     \Illuminate\Support\Facades\Route::get('/config', [$controller, 'config'])->name('config');
+                    \Illuminate\Support\Facades\Route::get('/resources', [$controller, 'resources'])->name('resources');
                     \Illuminate\Support\Facades\Route::post('/chat', [$controller, 'chat'])->name('chat');
                     \Illuminate\Support\Facades\Route::post('/stream', [$controller, 'stream'])->name('stream');
 
