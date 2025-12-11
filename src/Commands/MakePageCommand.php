@@ -23,6 +23,10 @@ class MakePageCommand extends GeneratorCommand
 
         if ($result !== false) {
             $this->createVueViewFile();
+
+            // Run optimize to clear and rebuild caches
+            $this->components->info('Running optimize to rebuild caches...');
+            $this->call('optimize');
         }
 
         return $result;

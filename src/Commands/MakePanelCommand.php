@@ -24,9 +24,6 @@ class MakePanelCommand extends Command
         // Create directory structure
         $this->createDirectories($studlyId);
 
-        // Create dashboard page
-        $this->createDashboard($studlyId);
-
         // Register provider
         $this->registerProvider($studlyId);
 
@@ -36,6 +33,11 @@ class MakePanelCommand extends Command
         $this->components->info("Pages directory: app/Laravilt/{$studlyId}/Pages");
         $this->components->info("Resources directory: app/Laravilt/{$studlyId}/Resources");
         $this->components->info("Widgets directory: app/Laravilt/{$studlyId}/Widgets");
+
+        // Run optimize to clear and rebuild caches
+        $this->newLine();
+        $this->components->info('Running optimize to rebuild caches...');
+        $this->call('optimize');
 
         return self::SUCCESS;
     }
@@ -73,28 +75,6 @@ class MakePanelCommand extends Command
         }
 
         $this->components->info("Directories created in app/Laravilt/{$studlyId}");
-    }
-
-    protected function createDashboard(string $studlyId): void
-    {
-        // Create PHP Dashboard page
-        $stub = File::get(__DIR__.'/../../stubs/dashboard-page.stub');
-        $content = str_replace(
-            ['{{ namespace }}', '{{ class }}', '{{ title }}'],
-            ["App\\Laravilt\\{$studlyId}\\Pages", 'Dashboard', "{$studlyId} Dashboard"],
-            $stub
-        );
-        $path = app_path("Laravilt/{$studlyId}/Pages/Dashboard.php");
-        File::put($path, $content);
-        $this->components->info("Dashboard page created: {$path}");
-
-        // Create Vue Dashboard page
-        $vueStub = File::get(__DIR__.'/../../stubs/dashboard.stub');
-        $vueContent = str_replace('{{ studlyId }}', $studlyId, $vueStub);
-        $vuePath = resource_path("js/pages/{$studlyId}/Dashboard.vue");
-        File::ensureDirectoryExists(dirname($vuePath));
-        File::put($vuePath, $vueContent);
-        $this->components->info("Dashboard view created: {$vuePath}");
     }
 
     protected function registerProvider(string $studlyId): void

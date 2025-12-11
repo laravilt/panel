@@ -639,6 +639,11 @@ class MakeResourceCommand extends Command
             $this->line("  API: app/Laravilt/{$panel}/Resources/{$modelName}/Api/{$modelName}Api.php");
         }
 
+        // Run optimize to clear and rebuild caches
+        $this->newLine();
+        $this->components->info('Running optimize to rebuild caches...');
+        $this->call('optimize');
+
         return self::SUCCESS;
     }
 

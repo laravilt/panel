@@ -131,6 +131,11 @@ class MakeRelationManagerCommand extends Command
         $this->line('      ];');
         $this->line('  }');
 
+        // Run optimize to clear and rebuild caches
+        $this->newLine();
+        $this->components->info('Running optimize to rebuild caches...');
+        $this->call('optimize');
+
         return self::SUCCESS;
     }
 

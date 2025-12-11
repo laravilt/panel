@@ -130,9 +130,37 @@ class InstallCommand extends Command
     protected function publishComponents(): void
     {
         $components = [
+            // Core layout components
+            'AppSidebar.vue',
             'AppSidebarHeader.vue',
+            'AppShell.vue',
+            'AppContent.vue',
+            'AppHeader.vue',
+            'AppLogo.vue',
+            'AppLogoIcon.vue',
+
+            // Navigation components
+            'NavMain.vue',
+            'NavFooter.vue',
             'NavUser.vue',
+            'Breadcrumbs.vue',
+
+            // UI components
+            'Heading.vue',
+            'HeadingSmall.vue',
+            'Icon.vue',
+            'InputError.vue',
+            'TextLink.vue',
+            'UserInfo.vue',
             'UserMenuContent.vue',
+            'PlaceholderPattern.vue',
+            'AlertError.vue',
+            'AppearanceTabs.vue',
+
+            // Auth components
+            'DeleteUser.vue',
+            'TwoFactorRecoveryCodes.vue',
+            'TwoFactorSetupModal.vue',
         ];
 
         foreach ($components as $component) {

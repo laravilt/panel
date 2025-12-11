@@ -17,6 +17,22 @@ class MakeClusterCommand extends GeneratorCommand
     protected $type = 'Cluster';
 
     /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $result = parent::handle();
+
+        if ($result !== false) {
+            // Run optimize to clear and rebuild caches
+            $this->components->info('Running optimize to rebuild caches...');
+            $this->call('optimize');
+        }
+
+        return $result;
+    }
+
+    /**
      * Get the stub file for the generator.
      */
     protected function getStub(): string
