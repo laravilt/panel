@@ -149,6 +149,14 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
     }
 
     /**
+     * Get the navigation label (alias for getLabel for consistency with clusters).
+     */
+    public static function getNavigationLabel(): string
+    {
+        return static::$navigationLabel ?? static::getLabel();
+    }
+
+    /**
      * Get the navigation sort order.
      */
     public static function getNavigationSort(): int
@@ -524,6 +532,12 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
                 return $actionClone->toArray();
             })->values()->all();
 
+        // Serialize widgets if page has them
+        $headerWidgets = [];
+        if (method_exists($this, 'getWidgets')) {
+            $headerWidgets = $this->serializeWidgets($this->getWidgets());
+        }
+
         $baseProps = [
             'page' => [
                 'heading' => $this->getHeading(),
@@ -531,6 +545,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
                 'headerActions' => $allActions,
                 'actionUrl' => $this->getActionUrl(),
             ],
+            'title' => static::getTitle(),
             'breadcrumbs' => $this->getBreadcrumbs(),
             'pageSlug' => static::getSlug(),
             'panelId' => $this->getPanel()->getId(),
@@ -547,7 +562,10 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
             'bottomHook' => $this->getBottomHook(),
             'clusterNavigation' => $clusterNavigation,
             'clusterTitle' => $clusterClass ? $clusterClass::getNavigationLabel() : null,
+            'clusterIcon' => $clusterClass ? $clusterClass::getNavigationIcon() : null,
             'clusterDescription' => null,
+            'headerWidgets' => $headerWidgets,
+            'footerWidgets' => [],
         ];
 
         $inertiaProps = $this->getInertiaProps();
@@ -565,6 +583,52 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
     public function toHtml()
     {
         return $this->render();
+    }
+
+    /**
+     * Serialize widgets for Inertia.
+     *
+     * @param  array  $widgets
+     */
+    protected function serializeWidgets(array $widgets): array
+    {
+        // Separate Stat widgets from other widgets
+        $statWidgets = [];
+        $otherWidgets = [];
+
+        foreach ($widgets as $widget) {
+            // If it's a class name string, instantiate it
+            if (is_string($widget) && class_exists($widget)) {
+                $widget = new $widget;
+            }
+
+            // Check if it's a Stat
+            if ($widget instanceof \Laravilt\Widgets\Stat) {
+                $statWidgets[] = $widget->toInertiaProps();
+            } elseif ($widget instanceof \Laravilt\Widgets\Widget) {
+                $otherWidgets[] = $widget->toInertiaProps();
+            } elseif (is_array($widget)) {
+                $otherWidgets[] = $widget;
+            }
+        }
+
+        $result = [];
+
+        // Wrap all Stats in a StatsOverviewWidget
+        if (! empty($statWidgets)) {
+            $result[] = [
+                'component' => 'StatsOverviewWidget',
+                'stats' => $statWidgets,
+                'columns' => min(count($statWidgets), 4),
+            ];
+        }
+
+        // Add other widgets
+        foreach ($otherWidgets as $widget) {
+            $result[] = $widget;
+        }
+
+        return $result;
     }
 
     /**

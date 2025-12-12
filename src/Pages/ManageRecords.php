@@ -148,6 +148,7 @@ abstract class ManageRecords extends ListRecords
         $modelClass = $resource::getModel();
         $formSchema = $this->form(Schema::make())->getSchema();
         $slug = $resource::getSlug();
+        $page = $this;
 
         return \Laravilt\Actions\CreateAction::make()
             ->stableId("{$slug}_create")
@@ -155,7 +156,40 @@ abstract class ManageRecords extends ListRecords
             ->modalHeading(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
             ->model($modelClass)
             ->formSchema($formSchema)
-            ->using();
+            ->action(function (array $data) use ($modelClass, $page) {
+                // Apply mutation hook
+                $data = $page->mutateFormDataBeforeCreate($data);
+
+                // Create the record
+                $record = new $modelClass;
+                $record->fill($data);
+                $record->save();
+
+                \Laravilt\Notifications\Notification::success()
+                    ->title(__('notifications::notifications.success'))
+                    ->body(__('notifications::notifications.record_created'))
+                    ->send();
+
+                return $record;
+            });
+    }
+
+    /**
+     * Mutate form data before creating a record.
+     * Override this method to add custom data transformations.
+     */
+    public function mutateFormDataBeforeCreate(array $data): array
+    {
+        return $data;
+    }
+
+    /**
+     * Mutate form data before saving/updating a record.
+     * Override this method to add custom data transformations.
+     */
+    public function mutateFormDataBeforeSave(array $data): array
+    {
+        return $data;
     }
 
     /**
@@ -192,6 +226,7 @@ abstract class ManageRecords extends ListRecords
         }
 
         if ($this->canEdit()) {
+            $page = $this;
             $recordActions[] = Action::make('edit')
                 ->stableId("{$slug}_edit")
                 ->label(__('actions::actions.buttons.edit'))
@@ -204,7 +239,7 @@ abstract class ManageRecords extends ListRecords
                 ->modalSubmitActionLabel(__('actions::actions.buttons.save'))
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
                 ->modalWidth('lg')
-                ->action(function ($record, array $data) use ($modelClass) {
+                ->action(function ($record, array $data) use ($modelClass, $page) {
                     // Get record ID - handle both object and array formats
                     $recordId = null;
                     if (is_object($record) && isset($record->id)) {
@@ -216,6 +251,9 @@ abstract class ManageRecords extends ListRecords
                     if (! $recordId) {
                         throw new \Exception(__('actions::actions.errors.no_record_id'));
                     }
+
+                    // Apply mutation hook
+                    $data = $page->mutateFormDataBeforeSave($data);
 
                     $existingRecord = $modelClass::findOrFail($recordId);
                     $existingRecord->fill($data);
@@ -308,6 +346,18 @@ abstract class ManageRecords extends ListRecords
 
         // Return the Table object - Page::render() will call toInertiaProps()
         return [$table];
+    }
+
+    /**
+     * Get the form schema for reactive field updates.
+     * This is called by ReactiveFieldController for modal form live updates.
+     *
+     * @param array $formData Current form data
+     * @return \Laravilt\Schemas\Schema
+     */
+    public function getFormSchema(array $formData = []): \Laravilt\Schemas\Schema
+    {
+        return $this->form(Schema::make());
     }
 
     /**

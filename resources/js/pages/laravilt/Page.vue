@@ -102,11 +102,15 @@ const getViewStorageKey = () => {
     return `laravilt_view_${props.pageSlug || 'default'}`;
 };
 
+// Computed: Available views with proper default
+const computedAvailableViews = computed(() => {
+    return props.availableViews || ['table', 'grid'];
+});
+
 const getSavedView = (): 'table' | 'grid' | 'api' | null => {
     if (typeof window === 'undefined') return null;
     const saved = localStorage.getItem(getViewStorageKey());
-    const validViews = props.availableViews || ['table', 'grid'];
-    if (saved && validViews.includes(saved)) {
+    if (saved && computedAvailableViews.value.includes(saved)) {
         return saved as 'table' | 'grid' | 'api';
     }
     return null;
@@ -144,8 +148,7 @@ const needsViewCheck = computed(() => {
 
     // Check if saved view differs from current
     const saved = localStorage.getItem(`laravilt_view_${props.pageSlug || 'default'}`);
-    const validViews = props.availableViews || ['table', 'grid'];
-    if (saved && validViews.includes(saved)) {
+    if (saved && computedAvailableViews.value.includes(saved)) {
         return saved !== (props.currentView || 'table');
     }
 
@@ -688,8 +691,9 @@ onMounted(() => {
                             class="flex items-center rounded-md border bg-muted p-1"
                             data-view-toggle
                         >
-                            <!-- Table View Button (always shown) -->
+                            <!-- Table View Button (only if table view is available) -->
                             <button
+                                v-if="computedAvailableViews.includes('table')"
                                 type="button"
                                 @click="toggleView('table')"
                                 :class="[
@@ -708,9 +712,9 @@ onMounted(() => {
                                     <line x1="9" y1="3" x2="9" y2="21"/>
                                 </svg>
                             </button>
-                            <!-- Grid View Button (only if grid option is available) -->
+                            <!-- Grid View Button (only if grid view is available) -->
                             <button
-                                v-if="hasGridOption"
+                                v-if="computedAvailableViews.includes('grid')"
                                 type="button"
                                 @click="toggleView('grid')"
                                 :class="[
@@ -731,7 +735,7 @@ onMounted(() => {
                             </button>
                             <!-- API View Button (only if API option is available) -->
                             <button
-                                v-if="hasApiOption"
+                                v-if="computedAvailableViews.includes('api')"
                                 type="button"
                                 @click="toggleView('api')"
                                 :class="[

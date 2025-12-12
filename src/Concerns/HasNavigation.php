@@ -37,11 +37,12 @@ trait HasNavigation
                 ->all();
         }
 
-        // Build from pages and resources
+        // Build from pages, resources, and clusters
         return collect(NavigationBuilder::fromPagesAndResources(
             $this->getPages(),
             $this->getResources(),
-            $this
+            $this,
+            $this->getClusters()
         )->get())
             ->map(fn ($item) => $item->toArray())
             ->all();

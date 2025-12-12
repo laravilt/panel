@@ -107,16 +107,28 @@ class NavigationBuilder
     /**
      * Build from pages and resources.
      */
-    public static function fromPagesAndResources(array $pages, array $resources, Panel $panel): static
+    public static function fromPagesAndResources(array $pages, array $resources, Panel $panel, array $clusters = []): static
     {
         $builder = new static;
         $builder->panel($panel);
 
-        // Combine pages and resources for navigation
+        // Get pages that belong to clusters
+        $clusterPages = collect($pages)
+            ->filter(function ($page) {
+                return method_exists($page, 'getCluster') && $page::getCluster() !== null;
+            })
+            ->groupBy(fn ($page) => $page::getCluster());
+
+        // Combine pages and resources for navigation (excluding cluster pages)
         $navigationItems = collect($pages)
             ->filter(function ($page) {
-                // Skip clusters - they don't register in navigation
+                // Skip clusters - they are added separately
                 if (is_subclass_of($page, \Laravilt\Panel\Cluster::class)) {
+                    return false;
+                }
+
+                // Skip pages that belong to a cluster
+                if (method_exists($page, 'getCluster') && $page::getCluster() !== null) {
                     return false;
                 }
 
@@ -158,7 +170,7 @@ class NavigationBuilder
             $grouped->forget('__ungrouped');
         }
 
-        // Add grouped items
+        // Add grouped items (regular navigation groups)
         foreach ($grouped as $groupLabel => $items) {
             $groupItems = [];
 
@@ -182,6 +194,50 @@ class NavigationBuilder
 
             $builder->group($groupLabel, $groupItems);
         }
+
+        // Add clusters as single navigation items (clicking opens cluster page with internal sidebar)
+        foreach ($clusters as $clusterClass) {
+            if (! $clusterClass::shouldRegisterNavigation()) {
+                continue;
+            }
+
+            $clusterSlug = $clusterClass::getSlug();
+            $clusterLabel = $clusterClass::getNavigationLabel();
+            $clusterIcon = $clusterClass::getNavigationIcon();
+            $clusterSort = $clusterClass::getNavigationSort() ?? 999;
+
+            // Get pages that belong to this cluster to find the first page URL
+            $pagesInCluster = $clusterPages->get($clusterClass, collect())
+                ->sortBy(fn ($page) => $page::getNavigationSort());
+
+            if ($pagesInCluster->isEmpty()) {
+                continue;
+            }
+
+            // Get the first page's URL for the cluster link
+            $firstPage = $pagesInCluster->first();
+            $firstPageSlug = $firstPage::getSlug();
+            $clusterUrl = $panel->url("{$clusterSlug}/{$firstPageSlug}");
+
+            // Create cluster as a single nav item with activeMatchPrefix for all cluster pages
+            $navItem = NavigationItem::make($clusterLabel)
+                ->icon($clusterIcon)
+                ->url($clusterUrl)
+                ->sort($clusterSort)
+                ->activeMatchPrefix($panel->url($clusterSlug));
+
+            $builder->item($navItem);
+        }
+
+        // Sort items by their sort order
+        usort($builder->items, function ($a, $b) {
+            return ($a->getSort() ?? 999) <=> ($b->getSort() ?? 999);
+        });
+
+        // Sort groups by their sort order
+        usort($builder->groups, function ($a, $b) {
+            return ($a->getSort() ?? 999) <=> ($b->getSort() ?? 999);
+        });
 
         return $builder;
     }

@@ -210,11 +210,18 @@ class Dashboard extends Page
         $headerWidgets = $this->serializeWidgets($this->getHeaderWidgets());
         $footerWidgets = $this->serializeWidgets($this->getFooterWidgets());
 
+        // Get cluster navigation if this page belongs to a cluster
+        $clusterClass = static::getCluster();
+        $clusterNavigation = $this->getClusterNavigation();
+
         return \Inertia\Inertia::render($component, [
             'title' => static::getTitle(),
             'breadcrumbs' => $this->getBreadcrumbs(),
             'headerWidgets' => $headerWidgets,
             'footerWidgets' => $footerWidgets,
+            'clusterNavigation' => $clusterNavigation,
+            'clusterTitle' => $clusterClass ? $clusterClass::getNavigationLabel() : null,
+            'clusterIcon' => $clusterClass ? $clusterClass::getNavigationIcon() : null,
         ]);
     }
 

@@ -198,12 +198,6 @@ abstract class ListRecords extends Page
     public function getCurrentView(): string
     {
         $resource = static::getResource();
-
-        // If gridOnly, always return grid view
-        if ($resource::isGridOnly()) {
-            return 'grid';
-        }
-
         $sessionKey = $this->getViewSessionKey();
         $urlView = request()->query('view');
         $availableViews = $this->getAvailableViews();
@@ -216,7 +210,8 @@ abstract class ListRecords extends Page
                 return $urlView;
             }
 
-            return $this->defaultView;
+            // Invalid view param - return default based on gridOnly
+            return $resource::isGridOnly() ? 'grid' : $this->defaultView;
         }
 
         // No URL param - check session for saved preference
@@ -226,7 +221,8 @@ abstract class ListRecords extends Page
             return $sessionView;
         }
 
-        return $this->defaultView;
+        // Default: grid for gridOnly, otherwise defaultView
+        return $resource::isGridOnly() ? 'grid' : $this->defaultView;
     }
 
     /**

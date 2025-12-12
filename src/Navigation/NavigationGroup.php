@@ -17,6 +17,8 @@ class NavigationGroup implements Arrayable
 
     protected ?string $icon = null;
 
+    protected ?int $sort = null;
+
     /**
      * Make a new navigation group.
      */
@@ -98,6 +100,24 @@ class NavigationGroup implements Arrayable
     public function getIcon(): ?string
     {
         return $this->icon;
+    }
+
+    /**
+     * Set the group sort order.
+     */
+    public function sort(?int $sort): static
+    {
+        $this->sort = $sort;
+
+        return $this;
+    }
+
+    /**
+     * Get the group sort order.
+     */
+    public function getSort(): ?int
+    {
+        return $this->sort;
     }
 
     /**

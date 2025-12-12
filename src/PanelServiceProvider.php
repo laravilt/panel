@@ -51,6 +51,16 @@ class PanelServiceProvider extends ServiceProvider
             __DIR__.'/../stubs/ui' => resource_path('js/components/ui'),
         ], 'laravilt-panel-ui');
 
+        // Publish lib utilities (utils.ts with urlIsActive, etc.)
+        $this->publishes([
+            __DIR__.'/../stubs/lib' => resource_path('js/lib'),
+        ], 'laravilt-panel-lib');
+
+        // Publish NavMain component
+        $this->publishes([
+            __DIR__.'/../stubs/components/NavMain.vue.stub' => resource_path('js/components/NavMain.vue'),
+        ], 'laravilt-panel-components');
+
         // Register panel's custom Authenticate middleware as 'panel.auth' alias
         $router = $this->app->make(\Illuminate\Routing\Router::class);
         $router->aliasMiddleware('panel.auth', Http\Middleware\Authenticate::class);
@@ -129,7 +139,12 @@ class PanelServiceProvider extends ServiceProvider
                     ->prefix($panel->getPath())
                     ->name($panel->getId().'.')
                     ->group(function () use ($panel) {
-                        // Register page routes
+                        // Register cluster routes first (for pages that belong to clusters)
+                        foreach ($panel->getClusters() as $clusterClass) {
+                            $this->registerCustomClusterRoutes($clusterClass, $panel);
+                        }
+
+                        // Register page routes (pages without clusters)
                         foreach ($panel->getPages() as $pageClass) {
                             $this->registerPageRoute($pageClass, $panel);
                         }
@@ -200,6 +215,9 @@ class PanelServiceProvider extends ServiceProvider
 
         // Register column update route for editable columns (ToggleColumn, etc.)
         $this->registerColumnUpdateRoute($resourceClass, $slug, $modelClass, $panel);
+
+        // Register reorder route for tables with reorderable enabled
+        $this->registerReorderRoute($resourceClass, $slug, $modelClass, $panel);
 
         // Register relation manager routes
         $this->registerRelationManagerRoutes($resourceClass, $slug, $modelClass, $panel);
@@ -358,6 +376,50 @@ class PanelServiceProvider extends ServiceProvider
 
             return back();
         })->name('resources.'.$slug.'.column.update');
+    }
+
+    /**
+     * Register route for reordering records (used by tables with ->reorderable())
+     */
+    protected function registerReorderRoute(string $resourceClass, string $slug, string $modelClass, Panel $panel): void
+    {
+        Route::post($slug.'/reorder', function () use ($resourceClass, $modelClass) {
+            $items = request()->input('items', []);
+            $column = request()->input('column', 'sort_order');
+
+            if (empty($items)) {
+                return response()->json(['error' => 'No items provided'], 400);
+            }
+
+            // Validate the column name (only allow alphanumeric and underscores)
+            if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $column)) {
+                return response()->json(['error' => 'Invalid column name'], 400);
+            }
+
+            // Update each record's order
+            foreach ($items as $item) {
+                if (isset($item['id']) && isset($item['order'])) {
+                    $modelClass::where('id', $item['id'])->update([$column => $item['order']]);
+                }
+            }
+
+            // For AJAX requests, return JSON with notification data (don't use session flash)
+            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
+                return response()->json([
+                    'success' => true,
+                    'message' => __('notifications::notifications.records_reordered', ['count' => count($items)]),
+                    'reordered_count' => count($items),
+                ]);
+            }
+
+            // For Inertia/full page requests, use session flash notification
+            \Laravilt\Notifications\Notification::success()
+                ->title(__('notifications::notifications.success'))
+                ->body(__('notifications::notifications.records_reordered', ['count' => count($items)]))
+                ->send();
+
+            return back();
+        })->name('resources.'.$slug.'.reorder');
     }
 
     /**
@@ -1076,6 +1138,54 @@ class PanelServiceProvider extends ServiceProvider
 
                 return $page->destroyOthers(request());
             })->name($routeName.'.logout-others');
+        }
+    }
+
+    /**
+     * Register routes for a custom cluster and its pages.
+     */
+    protected function registerCustomClusterRoutes(string $clusterClass, Panel $panel): void
+    {
+        $clusterSlug = $clusterClass::getSlug();
+        $panelId = $panel->getId();
+
+        // Find all pages that belong to this cluster
+        $clusterPages = collect($panel->getPages())
+            ->filter(fn ($pageClass) => method_exists($pageClass, 'getCluster') && $pageClass::getCluster() === $clusterClass)
+            ->values();
+
+        // Register routes for each page in the cluster
+        foreach ($clusterPages as $pageClass) {
+            $pageSlug = $pageClass::getSlug();
+            $pagePath = "{$clusterSlug}/{$pageSlug}";
+
+            // GET route - use 'create' method for dashboard-style pages
+            Route::get($pagePath, [$pageClass, 'create'])
+                ->name("{$clusterSlug}.{$pageSlug}");
+
+            // POST route for form submissions
+            Route::post($pagePath, function () use ($pageClass, $panel) {
+                $page = app($pageClass);
+                $page->panel($panel);
+                $page->boot();
+                $page->mount();
+
+                if (method_exists($page, 'store')) {
+                    return $page->store(request());
+                }
+
+                return $page->executeAction(request());
+            })->name("{$clusterSlug}.{$pageSlug}.store");
+        }
+
+        // Register cluster index route (redirect to first page)
+        if ($clusterPages->isNotEmpty()) {
+            $firstPage = $clusterPages->first();
+            $firstPageSlug = $firstPage::getSlug();
+
+            Route::get($clusterSlug, function () use ($panelId, $clusterSlug, $firstPageSlug) {
+                return redirect()->route("{$panelId}.{$clusterSlug}.{$firstPageSlug}");
+            })->name($clusterSlug);
         }
     }
 

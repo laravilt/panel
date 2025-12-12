@@ -26,6 +26,11 @@ class NavigationItem implements Arrayable
     protected ?string $translationKey = null;
 
     /**
+     * URL prefix for active state matching (e.g., for clusters).
+     */
+    protected ?string $activeMatchPrefix = null;
+
+    /**
      * Make a new navigation item.
      */
     public static function make(string|Closure $label): static
@@ -208,6 +213,24 @@ class NavigationItem implements Arrayable
     }
 
     /**
+     * Set the active match prefix for URL prefix matching.
+     */
+    public function activeMatchPrefix(?string $prefix): static
+    {
+        $this->activeMatchPrefix = $prefix;
+
+        return $this;
+    }
+
+    /**
+     * Get the active match prefix.
+     */
+    public function getActiveMatchPrefix(): ?string
+    {
+        return $this->activeMatchPrefix;
+    }
+
+    /**
      * Convert to array.
      */
     public function toArray(): array
@@ -223,6 +246,7 @@ class NavigationItem implements Arrayable
             'sort' => $this->getSort(),
             'active' => $this->isActive(),
             'method' => $this->getMethod(),
+            'activeMatchPrefix' => $this->activeMatchPrefix,  // For cluster prefix matching
         ];
     }
 

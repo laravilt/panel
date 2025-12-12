@@ -271,7 +271,7 @@ onMounted(() => {
                 class="h-12 w-12 text-muted-foreground mb-4"
             />
             <h4 class="text-sm font-medium text-muted-foreground">
-                {{ trans('table.no_data') }}
+                {{ trans('tables::tables.columns.no_data') }}
             </h4>
             <div v-if="configuredHeaderActions.length > 0" class="mt-4">
                 <ActionButton

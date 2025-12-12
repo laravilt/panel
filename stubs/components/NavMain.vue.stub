@@ -9,34 +9,60 @@ import {
     SidebarMenuSubButton,
     SidebarMenuSubItem,
     SidebarMenuBadge,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import {
     Collapsible,
     CollapsibleContent,
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { urlIsActive } from '@/lib/utils';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import { ChevronRight } from 'lucide-vue-next';
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted, nextTick, computed } from 'vue';
 
 const props = defineProps<{
     items: NavItem[];
 }>();
 
+// Get sidebar state to determine if collapsed to icon mode
+const { state: sidebarState } = useSidebar();
+const isCollapsed = computed(() => sidebarState.value === 'collapsed');
+
 // Get badge variant based on color
-function getBadgeVariant(color?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+function getBadgeVariant(color?: string): 'default' | 'secondary' | 'destructive' | 'outline' | 'primary' | 'success' | 'danger' | 'warning' | 'info' | 'gray' {
     switch (color) {
+        case 'primary':
+            return 'primary';
+        case 'success':
+        case 'green':
+            return 'success';
         case 'danger':
         case 'red':
-            return 'destructive';
+            return 'danger';
+        case 'warning':
+        case 'yellow':
+        case 'orange':
+            return 'warning';
+        case 'info':
+        case 'blue':
+            return 'info';
         case 'secondary':
-        case 'gray':
             return 'secondary';
+        case 'gray':
+            return 'gray';
         case 'outline':
             return 'outline';
+        case 'destructive':
+            return 'destructive';
         default:
             return 'default';
     }
@@ -97,9 +123,56 @@ function shouldAnimate(title: string): boolean {
     <SidebarGroup class="px-2 py-0">
         <SidebarMenu class="mt-6">
             <template v-for="item in items" :key="item.title">
-                <!-- Navigation Group with nested items -->
+                <!-- Navigation Group with nested items - Dropdown mode when collapsed -->
+                <SidebarMenuItem
+                    v-if="item.type === 'group' && item.items && item.items.length > 0 && isCollapsed"
+                >
+                    <DropdownMenu>
+                        <DropdownMenuTrigger as-child>
+                            <SidebarMenuButton :tooltip="item.title">
+                                <component v-if="item.icon" :is="item.icon" />
+                                <span>{{ item.title }}</span>
+                                <ChevronRight
+                                    class="ms-auto transition-transform duration-200 rtl:-rotate-180"
+                                />
+                            </SidebarMenuButton>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                            side="right"
+                            align="start"
+                            :side-offset="8"
+                            class="min-w-56"
+                        >
+                            <DropdownMenuItem
+                                v-for="subItem in item.items"
+                                :key="subItem.title"
+                                as-child
+                            >
+                                <Link
+                                    :href="subItem.url"
+                                    class="flex items-center justify-between w-full cursor-pointer"
+                                    :class="urlIsActive(subItem.url, page.url) ? 'bg-accent' : ''"
+                                >
+                                    <span class="flex items-center gap-2">
+                                        <component v-if="subItem.icon" :is="subItem.icon" class="size-4" />
+                                        <span>{{ subItem.title }}</span>
+                                    </span>
+                                    <Badge
+                                        v-if="subItem.badge || subItem.badgeCount"
+                                        :variant="getBadgeVariant(subItem.badgeColor)"
+                                        class="h-5 min-w-5 px-1.5 text-xs ml-auto"
+                                    >
+                                        {{ subItem.badge || subItem.badgeCount }}
+                                    </Badge>
+                                </Link>
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </SidebarMenuItem>
+
+                <!-- Navigation Group with nested items - Collapsible mode when expanded -->
                 <Collapsible
-                    v-if="item.type === 'group' && item.items && item.items.length > 0"
+                    v-else-if="item.type === 'group' && item.items && item.items.length > 0"
                     as-child
                     :open="openGroups[item.title]"
                     @update:open="(isOpen) => toggleGroup(item.title, isOpen)"
@@ -128,7 +201,7 @@ function shouldAnimate(title: string): boolean {
                                     >
                                         <Link :href="subItem.url" class="flex items-center justify-between w-full">
                                             <span class="flex items-center gap-2">
-                                                <component v-if="subItem.icon" :is="subItem.icon" />
+                                                <component v-if="subItem.icon" :is="subItem.icon" class="size-3.5" />
                                                 <span>{{ subItem.title }}</span>
                                             </span>
                                             <Badge

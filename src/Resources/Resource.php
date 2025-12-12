@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Laravilt\Panel\Resources;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Laravilt\AI\AIAgent;
 use Laravilt\Schemas\Schema;
@@ -196,6 +197,15 @@ abstract class Resource
     public static function getModel(): string
     {
         return static::$model;
+    }
+
+    /**
+     * Get the Eloquent query for retrieving records.
+     * Override this method to customize the query (e.g., filter by user, scope, etc.).
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return static::getModel()::query();
     }
 
     public static function getLabel(): string
