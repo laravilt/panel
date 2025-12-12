@@ -587,8 +587,6 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
 
     /**
      * Serialize widgets for Inertia.
-     *
-     * @param  array  $widgets
      */
     protected function serializeWidgets(array $widgets): array
     {

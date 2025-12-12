@@ -352,8 +352,7 @@ abstract class ManageRecords extends ListRecords
      * Get the form schema for reactive field updates.
      * This is called by ReactiveFieldController for modal form live updates.
      *
-     * @param array $formData Current form data
-     * @return \Laravilt\Schemas\Schema
+     * @param  array  $formData  Current form data
      */
     public function getFormSchema(array $formData = []): \Laravilt\Schemas\Schema
     {

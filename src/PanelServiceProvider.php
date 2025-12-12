@@ -383,7 +383,7 @@ class PanelServiceProvider extends ServiceProvider
      */
     protected function registerReorderRoute(string $resourceClass, string $slug, string $modelClass, Panel $panel): void
     {
-        Route::post($slug.'/reorder', function () use ($resourceClass, $modelClass) {
+        Route::post($slug.'/reorder', function () use ($modelClass) {
             $items = request()->input('items', []);
             $column = request()->input('column', 'sort_order');
 
