@@ -45,12 +45,18 @@ const panelNavigation = computed(() => {
         url: item.url, // Include both href and url for compatibility
         icon: getIconComponent(item.icon),
         collapsed: item.collapsed, // Preserve collapsed state
+        badge: item.badge, // Badge text
+        badgeCount: item.badgeCount, // Badge count
+        badgeColor: item.badgeColor, // Badge color
         items: item.items?.map((subItem: any) => ({
             type: subItem.type,
             title: subItem.title,
             href: subItem.url,
             url: subItem.url,
             icon: getIconComponent(subItem.icon),
+            badge: subItem.badge,
+            badgeCount: subItem.badgeCount,
+            badgeColor: subItem.badgeColor,
         })),
     }));
 });

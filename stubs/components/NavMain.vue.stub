@@ -5,34 +5,169 @@ import {
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
+    SidebarMenuBadge,
 } from '@/components/ui/sidebar';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
 import { urlIsActive } from '@/lib/utils';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
+import { ChevronRight } from 'lucide-vue-next';
+import { ref, onMounted, nextTick } from 'vue';
 
-defineProps<{
+const props = defineProps<{
     items: NavItem[];
 }>();
 
+// Get badge variant based on color
+function getBadgeVariant(color?: string): 'default' | 'secondary' | 'destructive' | 'outline' {
+    switch (color) {
+        case 'danger':
+        case 'red':
+            return 'destructive';
+        case 'secondary':
+        case 'gray':
+            return 'secondary';
+        case 'outline':
+            return 'outline';
+        default:
+            return 'default';
+    }
+}
+
 const page = usePage();
+
+// Track open state for each group
+const openGroups = ref<Record<string, boolean>>({});
+
+// Track which groups should animate (only after user click)
+const animatingGroups = ref<Set<string>>(new Set());
+
+// Load saved group states from localStorage
+onMounted(() => {
+    const saved = localStorage.getItem('navigation-groups-state');
+    if (saved) {
+        try {
+            openGroups.value = JSON.parse(saved);
+        } catch (e) {
+            // Ignore parse errors
+        }
+    }
+
+    // Initialize any groups that don't have saved state
+    props.items.forEach(item => {
+        if (item.type === 'group' && !(item.title in openGroups.value)) {
+            openGroups.value[item.title] = !item.collapsed;
+        }
+    });
+});
+
+// Toggle group with animation (only called on user click)
+function toggleGroup(title: string, isOpen: boolean) {
+    // Mark this group for animation BEFORE state change
+    animatingGroups.value.add(title);
+
+    // Use nextTick to ensure data-animating is applied before state changes
+    nextTick(() => {
+        // Update state
+        openGroups.value[title] = isOpen;
+        localStorage.setItem('navigation-groups-state', JSON.stringify(openGroups.value));
+
+        // Remove animation flag after animation completes
+        setTimeout(() => {
+            animatingGroups.value.delete(title);
+        }, 250);
+    });
+}
+
+// Check if a group should animate
+function shouldAnimate(title: string): boolean {
+    return animatingGroups.value.has(title);
+}
 </script>
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
-        <SidebarMenu>
-            <SidebarMenuItem v-for="item in items" :key="item.title">
-                <SidebarMenuButton
+        <SidebarMenu class="mt-6">
+            <template v-for="item in items" :key="item.title">
+                <!-- Navigation Group with nested items -->
+                <Collapsible
+                    v-if="item.type === 'group' && item.items && item.items.length > 0"
                     as-child
-                    :is-active="urlIsActive(item.href, page.url)"
-                    :tooltip="item.title"
+                    :open="openGroups[item.title]"
+                    @update:open="(isOpen) => toggleGroup(item.title, isOpen)"
+                    class="group/collapsible"
+                    :data-animating="shouldAnimate(item.title) ? 'true' : undefined"
                 >
-                    <Link :href="item.href">
-                        <component :is="item.icon" />
-                        <span>{{ item.title }}</span>
-                    </Link>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <CollapsibleTrigger as-child>
+                            <SidebarMenuButton :tooltip="item.title">
+                                <component v-if="item.icon" :is="item.icon" />
+                                <span>{{ item.title }}</span>
+                                <ChevronRight
+                                    class="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:-rotate-180 rtl:group-data-[state=open]/collapsible:-rotate-90"
+                                />
+                            </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <SidebarMenuSub>
+                                <SidebarMenuSubItem
+                                    v-for="subItem in item.items"
+                                    :key="subItem.title"
+                                >
+                                    <SidebarMenuSubButton
+                                        as-child
+                                        :is-active="urlIsActive(subItem.url, page.url)"
+                                    >
+                                        <Link :href="subItem.url" class="flex items-center justify-between w-full">
+                                            <span class="flex items-center gap-2">
+                                                <component v-if="subItem.icon" :is="subItem.icon" />
+                                                <span>{{ subItem.title }}</span>
+                                            </span>
+                                            <Badge
+                                                v-if="subItem.badge || subItem.badgeCount"
+                                                :variant="getBadgeVariant(subItem.badgeColor)"
+                                                class="h-5 min-w-5 px-1.5 text-xs ml-auto"
+                                            >
+                                                {{ subItem.badge || subItem.badgeCount }}
+                                            </Badge>
+                                        </Link>
+                                    </SidebarMenuSubButton>
+                                </SidebarMenuSubItem>
+                            </SidebarMenuSub>
+                        </CollapsibleContent>
+                    </SidebarMenuItem>
+                </Collapsible>
+
+                <!-- Regular navigation item -->
+                <SidebarMenuItem v-else>
+                    <SidebarMenuButton
+                        as-child
+                        :is-active="urlIsActive(item.url || item.href, page.url)"
+                        :tooltip="item.title"
+                    >
+                        <Link :href="item.url || item.href">
+                            <component v-if="item.icon" :is="item.icon" />
+                            <span>{{ item.title }}</span>
+                        </Link>
+                    </SidebarMenuButton>
+                    <SidebarMenuBadge v-if="item.badge || item.badgeCount">
+                        <Badge
+                            :variant="getBadgeVariant(item.badgeColor)"
+                            class="h-5 min-w-5 px-1.5 text-xs"
+                        >
+                            {{ item.badge || item.badgeCount }}
+                        </Badge>
+                    </SidebarMenuBadge>
+                </SidebarMenuItem>
+            </template>
         </SidebarMenu>
     </SidebarGroup>
 </template>

@@ -138,12 +138,21 @@ class NavigationBuilder
         // Add ungrouped items
         if ($grouped->has('__ungrouped')) {
             foreach ($grouped->get('__ungrouped') as $item) {
-                $builder->item(
-                    NavigationItem::make($item::getLabel())
-                        ->icon($item::getNavigationIcon())
-                        ->url($item::getUrl($panel))
-                        ->sort($item::getNavigationSort())
-                );
+                $navItem = NavigationItem::make($item::getLabel())
+                    ->icon($item::getNavigationIcon())
+                    ->url($item::getUrl($panel))
+                    ->sort($item::getNavigationSort());
+
+                // Add badge if resource has it
+                if (method_exists($item, 'getNavigationBadge')) {
+                    $badge = $item::getNavigationBadge();
+                    $badgeColor = method_exists($item, 'getNavigationBadgeColor') ? $item::getNavigationBadgeColor() : null;
+                    if ($badge !== null) {
+                        $navItem->badge($badge, $badgeColor);
+                    }
+                }
+
+                $builder->item($navItem);
             }
 
             $grouped->forget('__ungrouped');
@@ -154,10 +163,21 @@ class NavigationBuilder
             $groupItems = [];
 
             foreach ($items as $item) {
-                $groupItems[] = NavigationItem::make($item::getLabel())
+                $navItem = NavigationItem::make($item::getLabel())
                     ->icon($item::getNavigationIcon())
                     ->url($item::getUrl($panel))
                     ->sort($item::getNavigationSort());
+
+                // Add badge if resource has it
+                if (method_exists($item, 'getNavigationBadge')) {
+                    $badge = $item::getNavigationBadge();
+                    $badgeColor = method_exists($item, 'getNavigationBadgeColor') ? $item::getNavigationBadgeColor() : null;
+                    if ($badge !== null) {
+                        $navItem->badge($badge, $badgeColor);
+                    }
+                }
+
+                $groupItems[] = $navItem;
             }
 
             $builder->group($groupLabel, $groupItems);

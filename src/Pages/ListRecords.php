@@ -112,6 +112,11 @@ abstract class ListRecords extends Page
     {
         $resource = static::getResource();
 
+        // If table is gridOnly, only show view toggle if API is available
+        if ($resource::isGridOnly()) {
+            return $resource::hasApi();
+        }
+
         // View toggle is available if we have grid OR api options
         $hasGridOption = $resource::hasTable() && $resource::hasCardConfig();
         $hasApiOption = $resource::hasApi();
@@ -131,10 +136,16 @@ abstract class ListRecords extends Page
 
     /**
      * Check if this resource has grid option (card configuration).
+     * Returns false if gridOnly is enabled (no toggle needed).
      */
     public function hasGridOption(): bool
     {
         $resource = static::getResource();
+
+        // If gridOnly, return false as no option is needed
+        if ($resource::isGridOnly()) {
+            return false;
+        }
 
         return $resource::hasTable() && $resource::hasCardConfig();
     }
@@ -156,6 +167,18 @@ abstract class ListRecords extends Page
      */
     public function getAvailableViews(): array
     {
+        $resource = static::getResource();
+
+        // If gridOnly, grid is the only data view but API may still be available
+        if ($resource::isGridOnly()) {
+            $views = ['grid'];
+            if ($this->hasApiOption()) {
+                $views[] = 'api';
+            }
+
+            return $views;
+        }
+
         $views = ['table'];
 
         if ($this->hasGridOption()) {
@@ -174,6 +197,13 @@ abstract class ListRecords extends Page
      */
     public function getCurrentView(): string
     {
+        $resource = static::getResource();
+
+        // If gridOnly, always return grid view
+        if ($resource::isGridOnly()) {
+            return 'grid';
+        }
+
         $sessionKey = $this->getViewSessionKey();
         $urlView = request()->query('view');
         $availableViews = $this->getAvailableViews();

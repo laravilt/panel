@@ -269,6 +269,8 @@ class MakeResourceCommand extends Command
     // Generator options
     protected bool $generateApi = false;
 
+    protected bool $generateAi = false;
+
     protected bool $isSimple = false;
 
     protected array $apiMethods = [];
@@ -278,6 +280,8 @@ class MakeResourceCommand extends Command
     protected bool $useApiTester = false;
 
     protected array $tableFeatures = [];
+
+    protected string $aiModel = 'GPT_4O_MINI';
 
     /**
      * Field name patterns for intelligent input type selection
@@ -572,6 +576,30 @@ class MakeResourceCommand extends Command
             );
         }
 
+        // Ask about AI generation
+        $this->generateAi = confirm(
+            label: 'Generate AI assistant configuration?',
+            default: false,
+            hint: 'AI assistant provides intelligent interactions for this resource'
+        );
+
+        if ($this->generateAi) {
+            $this->aiModel = select(
+                label: 'Which AI model would you like to use?',
+                options: [
+                    'GPT_4O_MINI' => 'GPT-4o Mini (Recommended)',
+                    'GPT_4O' => 'GPT-4o',
+                    'GPT_4_TURBO' => 'GPT-4 Turbo',
+                    'GPT_3_5_TURBO' => 'GPT-3.5 Turbo',
+                    'CLAUDE_3_HAIKU' => 'Claude 3 Haiku',
+                    'CLAUDE_3_SONNET' => 'Claude 3 Sonnet',
+                    'CLAUDE_3_OPUS' => 'Claude 3 Opus',
+                ],
+                default: 'GPT_4O_MINI',
+                hint: 'GPT-4o Mini is recommended for most use cases'
+            );
+        }
+
         // Ask about table features
         $this->tableFeatures = multiselect(
             label: 'Select table features:',
@@ -605,6 +633,9 @@ class MakeResourceCommand extends Command
                 $this->line('  - API Tester interface: Enabled');
             }
         }
+        if ($this->generateAi) {
+            $this->line('  - AI assistant: '.$this->aiModel);
+        }
         $this->newLine();
 
         if (! confirm('Proceed with resource generation?', true)) {
@@ -628,6 +659,10 @@ class MakeResourceCommand extends Command
             File::ensureDirectoryExists("{$resourceDir}/Api");
         }
 
+        if ($this->generateAi) {
+            File::ensureDirectoryExists("{$resourceDir}/Ai");
+        }
+
         // Detect soft deletes
         $hasSoftDeletes = collect($columns)->contains(fn ($col) => $col['name'] === 'deleted_at');
 
@@ -640,6 +675,10 @@ class MakeResourceCommand extends Command
 
         if ($this->generateApi) {
             $this->createApiFile($panel, $modelName, $columns, $resourceDir);
+        }
+
+        if ($this->generateAi) {
+            $this->createAiFile($panel, $modelName, $columns, $resourceDir);
         }
 
         $this->newLine();
@@ -657,6 +696,9 @@ class MakeResourceCommand extends Command
         }
         if ($this->generateApi) {
             $this->line("  API: app/Laravilt/{$panel}/Resources/{$modelName}/Api/{$modelName}Api.php");
+        }
+        if ($this->generateAi) {
+            $this->line("  AI: app/Laravilt/{$panel}/Resources/{$modelName}/Ai/{$modelName}Ai.php");
         }
 
         // Clear caches (don't rebuild as closures can't be serialized)
@@ -993,6 +1035,9 @@ PHP;
         // Build imports and method references based on options
         $apiImport = $this->generateApi ? "use App\\Laravilt\\{$panel}\\Resources\\{$modelName}\\Api\\{$modelName}Api;\nuse Laravilt\\Tables\\ApiResource;\n" : '';
 
+        // AI imports
+        $aiImport = $this->generateAi ? "use App\\Laravilt\\{$panel}\\Resources\\{$modelName}\\Ai\\{$modelName}Ai;\nuse Laravilt\\AI\\AIAgent;\n" : '';
+
         // Soft delete imports
         $softDeleteImport = $hasSoftDeletes ? "use Illuminate\\Database\\Eloquent\\Builder;\nuse Illuminate\\Database\\Eloquent\\SoftDeletingScope;\n" : '';
 
@@ -1002,6 +1047,15 @@ PHP;
     public static function api(ApiResource \$api): ApiResource
     {
         return {$modelName}Api::configure(\$api);
+    }
+PHP : '';
+
+        $aiMethod = $this->generateAi ? <<<PHP
+
+
+    public static function ai(AIAgent \$ai): AIAgent
+    {
+        return {$modelName}Ai::configure(\$ai);
     }
 PHP : '';
 
@@ -1059,7 +1113,7 @@ PHP;
 
 namespace App\Laravilt\\{$panel}\Resources\\{$modelName};
 
-{$apiImport}{$softDeleteImport}use App\Laravilt\\{$panel}\Resources\\{$modelName}\Form\\{$modelName}Form;
+{$aiImport}{$apiImport}{$softDeleteImport}use App\Laravilt\\{$panel}\Resources\\{$modelName}\Form\\{$modelName}Form;
 use App\Laravilt\\{$panel}\Resources\\{$modelName}\InfoList\\{$modelName}InfoList;
 {$pageImports}
 use App\Laravilt\\{$panel}\Resources\\{$modelName}\Table\\{$modelName}Table;
@@ -1093,7 +1147,7 @@ class {$modelName}Resource extends Resource
     public static function infolist(Schema \$schema): Schema
     {
         return {$modelName}InfoList::configure(\$schema);
-    }{$apiMethod}{$softDeleteMethod}
+    }{$aiMethod}{$apiMethod}{$softDeleteMethod}
 
 {$pagesMethod}
 
@@ -1426,6 +1480,110 @@ PHP;
         File::put("{$dir}/Api/{$modelName}Api.php", $content);
     }
 
+    protected function createAiFile(string $panel, string $modelName, array $columns, string $dir): void
+    {
+        $aiColumns = $this->generateAiColumns($columns);
+
+        // Determine AI provider class
+        $providerClass = str_contains($this->aiModel, 'CLAUDE') ? 'AnthropicProvider' : 'OpenAIProvider';
+        $modelEnum = str_contains($this->aiModel, 'CLAUDE') ? 'AnthropicModel' : 'OpenAIModel';
+        $providerImport = str_contains($this->aiModel, 'CLAUDE')
+            ? "use Laravilt\\AI\\Providers\\AnthropicProvider;\nuse Laravilt\\AI\\Enums\\AnthropicModel;"
+            : "use Laravilt\\AI\\Providers\\OpenAIProvider;\nuse Laravilt\\AI\\Enums\\OpenAIModel;";
+
+        $modelNameLower = Str::lower($modelName);
+        $modelNamePlural = Str::plural($modelNameLower);
+
+        $content = <<<PHP
+<?php
+
+namespace App\Laravilt\\{$panel}\Resources\\{$modelName}\Ai;
+
+use App\Models\\{$modelName};
+use Laravilt\AI\AIAgent;
+use Laravilt\AI\AIColumn;
+{$providerImport}
+
+class {$modelName}Ai
+{
+    public static function configure(AIAgent \$ai): AIAgent
+    {
+        return \$ai
+            ->name('{$modelNameLower}_assistant')
+            ->description('AI assistant for managing {$modelNamePlural}')
+            ->model({$modelName}::class)
+            ->provider({$providerClass}::class)
+            ->aiModel({$modelEnum}::{$this->aiModel})
+            ->systemPrompt('You are an AI assistant that helps users manage {$modelNamePlural}. You can query, create, update, and delete {$modelNamePlural} records.')
+            ->columns([
+{$aiColumns}
+            ])
+            ->canCreate()
+            ->canUpdate()
+            ->canDelete()
+            ->canQuery();
+    }
+}
+PHP;
+
+        File::put("{$dir}/Ai/{$modelName}Ai.php", $content);
+    }
+
+    protected function generateAiColumns(array $columns): string
+    {
+        $aiColumns = [];
+        $indent = '                ';
+
+        // Common searchable fields
+        $searchableFields = ['name', 'email', 'title', 'description', 'subject', 'company', 'username', 'phone'];
+        // Common filterable fields
+        $filterableFields = ['status', 'type', 'category', 'is_active', 'is_verified', 'role', 'priority'];
+
+        foreach ($columns as $column) {
+            $name = $column['name'];
+            $type = $column['type'] ?? 'string';
+
+            // Skip system columns
+            if (in_array($name, ['id', 'password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at', 'deleted_at'])) {
+                continue;
+            }
+
+            $methods = [];
+
+            // Add searchable for relevant fields
+            if (in_array($name, $searchableFields) || str_contains($name, 'name') || str_contains($name, 'title')) {
+                $methods[] = '->searchable()';
+            }
+
+            // Add filterable for relevant fields
+            if (in_array($name, $filterableFields)) {
+                $methods[] = '->filterable()';
+            }
+
+            // Add sortable for common sortable fields
+            if (in_array($name, ['created_at', 'updated_at', 'name', 'title', 'email', 'status', 'price', 'amount'])) {
+                $methods[] = '->sortable()';
+            }
+
+            // Add type
+            $aiType = match ($type) {
+                'integer', 'bigint', 'smallint', 'tinyint' => 'integer',
+                'decimal', 'float', 'double' => 'decimal',
+                'boolean' => 'boolean',
+                'date' => 'date',
+                'datetime', 'timestamp' => 'datetime',
+                'json' => 'array',
+                default => 'string',
+            };
+            $methods[] = "->type('{$aiType}')";
+
+            $methodsStr = implode('', $methods);
+            $aiColumns[] = "{$indent}AIColumn::make('{$name}'){$methodsStr},";
+        }
+
+        return implode("\n", $aiColumns);
+    }
+
     protected function createPageFiles(string $panel, string $modelName, string $dir, bool $isSimple = false): void
     {
         if ($isSimple) {
@@ -1441,6 +1599,13 @@ use Laravilt\Panel\Pages\ManageRecords;
 class Manage{$modelName} extends ManageRecords
 {
     protected static ?string \$resource = {$modelName}Resource::class;
+
+    public function getHeaderActions(): array
+    {
+        return [
+            \$this->getCreateAction(),
+        ];
+    }
 }
 PHP;
             File::put("{$dir}/Pages/Manage{$modelName}.php", $manageContent);

@@ -337,6 +337,20 @@ abstract class Resource
     }
 
     /**
+     * Check if the resource's table is configured for grid-only mode.
+     */
+    public static function isGridOnly(): bool
+    {
+        if (! static::hasTable()) {
+            return false;
+        }
+
+        $table = static::table(new Table);
+
+        return $table->isGridOnly();
+    }
+
+    /**
      * Check if the resource uses a Table for listing.
      */
     public static function hasTable(): bool
@@ -390,6 +404,15 @@ abstract class Resource
     }
 
     /**
+     * Get the badge count for navigation.
+     * Override this method to return dynamic counts (e.g., pending orders).
+     */
+    public static function getNavigationBadgeCount(): ?int
+    {
+        return null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function toArray(): array
@@ -403,6 +426,9 @@ abstract class Resource
             'navigationGroup' => static::$navigationGroup,
             'navigationSort' => static::$navigationSort,
             'navigationVisible' => static::$navigationVisible,
+            'navigationBadge' => static::getNavigationBadge(),
+            'navigationBadgeColor' => static::getNavigationBadgeColor(),
+            'navigationBadgeCount' => static::getNavigationBadgeCount(),
             'slug' => static::getSlug(),
             'pages' => static::getPages(),
             'relations' => static::getRelations(),
