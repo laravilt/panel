@@ -361,16 +361,12 @@ const handleFormSubmit = (event: Event) => {
         return;
     }
 
-    console.log('📝 Form data collected from FormRenderer:', data);
-
     // Step 3: Add action token
     if (action.actionToken) {
         data.token = action.actionToken;
     } else {
         data.action = action.name;
     }
-
-    console.log('🔐 Data with token:', data);
 
     // Step 4: Submit via Inertia - Backend validation will run in the action closure
     router.post(action.actionUrl, data, {
@@ -380,11 +376,10 @@ const handleFormSubmit = (event: Event) => {
         },
         preserveScroll: true,
         onError: (errors) => {
-            console.error('❌ Validation errors received:', errors);
-            console.log('📄 Page props errors:', props);
+            console.error('Validation errors received:', errors);
         },
         onSuccess: () => {
-            console.log('✅ Action executed successfully');
+            // Action executed successfully
         },
     });
 };
@@ -396,8 +391,6 @@ const handlePasskeyLogin = async () => {
     }
 
     try {
-        console.log('Starting passkey login...');
-
         // Get WebAuthn assertion options from server
         const optionsResponse = await fetch(props.passkeyLoginOptionsUrl, {
             credentials: 'same-origin',
@@ -407,13 +400,10 @@ const handlePasskeyLogin = async () => {
         });
 
         if (!optionsResponse.ok) {
-            const text = await optionsResponse.text();
-            console.error('Failed to fetch options:', optionsResponse.status, text);
             throw new Error(`Failed to fetch WebAuthn options: ${optionsResponse.status}`);
         }
 
         const options = await optionsResponse.json();
-        console.log('Received WebAuthn options:', options);
 
         // Convert base64url strings to ArrayBuffer
         options.challenge = base64urlDecode(options.challenge);
@@ -425,7 +415,6 @@ const handlePasskeyLogin = async () => {
         }
 
         // Get credential using WebAuthn API
-        console.log('Calling navigator.credentials.get...');
         const credential = await navigator.credentials.get({
             publicKey: options
         }) as PublicKeyCredential;
@@ -433,8 +422,6 @@ const handlePasskeyLogin = async () => {
         if (!credential) {
             throw new Error('No credential received');
         }
-
-        console.log('Credential received:', credential.id);
 
         // Prepare assertion data for server
         const assertionResponse = credential.response as AuthenticatorAssertionResponse;
@@ -449,8 +436,6 @@ const handlePasskeyLogin = async () => {
                 userHandle: assertionResponse.userHandle ? arrayBufferToBase64url(assertionResponse.userHandle) : null
             }
         };
-
-        console.log('Sending assertion to server...');
 
         // Send assertion to server
         const response = await fetch(props.passkeyLoginUrl, {
@@ -469,7 +454,6 @@ const handlePasskeyLogin = async () => {
         }
 
         const result = await response.json();
-        console.log('Login successful:', result);
 
         // Redirect to dashboard
         if (result.redirect) {
@@ -496,8 +480,6 @@ const handleSendMagicLink = async () => {
     sendingMagicLink.value = true;
 
     try {
-        console.log('Sending magic link...');
-
         const response = await fetch(props.magicLinkSendUrl, {
             method: 'POST',
             credentials: 'same-origin',
@@ -513,15 +495,8 @@ const handleSendMagicLink = async () => {
             throw new Error(errorData.error || `Failed to send magic link: ${response.status}`);
         }
 
-        const result = await response.json();
-        console.log('Magic link sent:', result);
-
+        await response.json();
         alert('Magic link sent! Check your email.');
-
-        // If in debug mode and URL is provided, log it
-        if (result.debug_url) {
-            console.log('Debug magic link URL:', result.debug_url);
-        }
 
     } catch (error) {
         console.error('Failed to send magic link:', error);
