@@ -130,7 +130,8 @@ abstract class EditRecord extends Page
     }
 
     /**
-     * Load many-to-many relationship IDs into form data.
+     * Load relationship data into form data.
+     * Handles BelongsToMany (IDs array) and HasMany (full records array for Repeaters).
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -162,9 +163,13 @@ abstract class EditRecord extends Page
             try {
                 $relation = $this->record->{$methodName}();
 
-                // Check if it's a BelongsToMany relationship
+                // Check if it's a BelongsToMany relationship - load IDs
                 if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
                     $data[$methodName] = $this->record->{$methodName}()->pluck($relation->getRelated()->getTable().'.id')->toArray();
+                }
+                // Check if it's a HasMany relationship - load full records (for Repeaters)
+                elseif ($relation instanceof \Illuminate\Database\Eloquent\Relations\HasMany) {
+                    $data[$methodName] = $this->record->{$methodName}()->get()->toArray();
                 }
             } catch (\Throwable $e) {
                 // Not a relationship method, skip
@@ -260,7 +265,9 @@ abstract class EditRecord extends Page
      */
     protected function validateFormData(array $data): array
     {
-        $form = $this->form(new \Laravilt\Schemas\Schema);
+        $resource = static::getResource();
+        $modelClass = $resource::getModel();
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
 
         $rules = $form->getValidationRules();
         $messages = $form->getValidationMessages();
@@ -295,9 +302,10 @@ abstract class EditRecord extends Page
      */
     public function getSchema(): array
     {
-        $form = $this->form(new \Laravilt\Schemas\Schema);
-
         $resource = static::getResource();
+        $modelClass = $resource::getModel();
+
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
 
         // Fill with record data if available
         if (isset($this->record)) {
@@ -362,11 +370,27 @@ abstract class EditRecord extends Page
         }
 
         $relationManagers = $resource::getRelations();
+        $resourceSlug = $resource::getSlug();
+
+        \Log::info('[EditRecord] getRelationManagers', [
+            'resource' => $resource,
+            'resourceSlug' => $resourceSlug,
+            'relationManagerCount' => count($relationManagers),
+        ]);
 
         return collect($relationManagers)
-            ->map(function ($relationManagerClass) {
+            ->map(function ($relationManagerClass) use ($resourceSlug) {
                 /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
                 $manager = $relationManagerClass::make($this->record);
+
+                if ($resourceSlug) {
+                    $manager->resourceSlug($resourceSlug);
+                }
+
+                \Log::info('[EditRecord] Created manager', [
+                    'managerClass' => $relationManagerClass,
+                    'resourceSlug' => $resourceSlug,
+                ]);
 
                 return $manager->toArray();
             })

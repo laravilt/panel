@@ -142,7 +142,9 @@ abstract class CreateRecord extends Page
      */
     protected function validateFormData(array $data): array
     {
-        $form = $this->form(new \Laravilt\Schemas\Schema);
+        $resource = static::getResource();
+        $modelClass = $resource::getModel();
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
 
         $rules = $form->getValidationRules();
         $messages = $form->getValidationMessages();
@@ -177,9 +179,10 @@ abstract class CreateRecord extends Page
      */
     public function getSchema(): array
     {
-        $form = $this->form(new \Laravilt\Schemas\Schema);
-
         $resource = static::getResource();
+        $modelClass = $resource::getModel();
+
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
 
         // Get the form schema
         $schema = $form->getSchema();

@@ -25,6 +25,8 @@ abstract class RelationManager
 
     protected Model $ownerRecord;
 
+    protected ?string $resourceSlug = null;
+
     public function __construct(Model $ownerRecord)
     {
         $this->ownerRecord = $ownerRecord;
@@ -33,6 +35,16 @@ abstract class RelationManager
     public static function make(Model $ownerRecord): static
     {
         return new static($ownerRecord);
+    }
+
+    /**
+     * Set the parent resource slug (for Select options pagination).
+     */
+    public function resourceSlug(string $slug): static
+    {
+        $this->resourceSlug = $slug;
+
+        return $this;
     }
 
     public static function getRelationship(): string
@@ -110,7 +122,17 @@ abstract class RelationManager
         $actions = [];
 
         if ($this->canCreate() && ! $this->isReadOnly()) {
-            $formSchema = $this->form(Schema::make())->getSchema();
+            // Get the related model class from the relationship
+            $relatedModel = $this->getRelationshipQuery()->getRelated();
+            $modelClass = get_class($relatedModel);
+
+            // Create schema with model, resourceSlug and relationManagerClass
+            $schema = Schema::make()->model($modelClass);
+            if ($this->resourceSlug) {
+                $schema->resourceSlug($this->resourceSlug);
+            }
+            $schema->relationManagerClass(static::class);
+            $formSchema = $this->form($schema)->getSchema();
 
             // Build the relation URL for creating records
             // This will be overridden by the frontend with the correct panel/resource/record context
@@ -145,6 +167,23 @@ abstract class RelationManager
             $table->headerActions([$action]);
         }
 
+        // Get the related model class from the relationship
+        $relatedModel = $this->getRelationshipQuery()->getRelated();
+        $modelClass = get_class($relatedModel);
+
+        \Log::info('[RelationManager] toArray', [
+            'relationManagerClass' => static::class,
+            'resourceSlug' => $this->resourceSlug,
+            'modelClass' => $modelClass,
+        ]);
+
+        // Create schema with model, resourceSlug and relationManagerClass
+        $formSchema = Schema::make()->model($modelClass);
+        if ($this->resourceSlug) {
+            $formSchema->resourceSlug($this->resourceSlug);
+        }
+        $formSchema->relationManagerClass(static::class);
+
         return [
             'relationship' => static::getRelationship(),
             'label' => static::getLabel(),
@@ -155,7 +194,7 @@ abstract class RelationManager
             'canCreate' => $this->canCreate(),
             'canEdit' => $this->canEdit(),
             'canDelete' => $this->canDelete(),
-            'form' => $this->form(Schema::make())->toInertiaProps(),
+            'form' => $this->form($formSchema)->toInertiaProps(),
             'infolist' => $this->infolist(Infolist::make())->toInertiaProps(),
             'table' => $table->toInertiaProps(),
             'headerActions' => collect($headerActions)->map(fn ($action) => $action->toArray())->values()->all(),

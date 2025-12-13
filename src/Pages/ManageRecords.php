@@ -146,7 +146,7 @@ abstract class ManageRecords extends ListRecords
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
-        $formSchema = $this->form(Schema::make())->getSchema();
+        $formSchema = $this->form(Schema::make()->model($modelClass))->getSchema();
         $slug = $resource::getSlug();
         $page = $this;
 
@@ -156,6 +156,7 @@ abstract class ManageRecords extends ListRecords
             ->modalHeading(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
             ->model($modelClass)
             ->formSchema($formSchema)
+            ->component(static::class) // For reactive fields in modal forms
             ->action(function (array $data) use ($modelClass, $page) {
                 // Apply mutation hook
                 $data = $page->mutateFormDataBeforeCreate($data);
@@ -202,12 +203,12 @@ abstract class ManageRecords extends ListRecords
         $slug = $resource::getSlug();
 
         // Get form and infolist schemas for modals
-        $formSchema = $this->form(Schema::make())->getSchema();
+        $modelClass = $resource::getModel();
+        $formSchema = $this->form(Schema::make()->model($modelClass))->getSchema();
         $infolistSchema = $this->infolist(Infolist::make())->toInertiaProps();
 
         // Build modal-based record actions
         $recordActions = [];
-        $modelClass = $resource::getModel();
 
         if ($this->canView()) {
             $recordActions[] = Action::make('view')
@@ -239,6 +240,7 @@ abstract class ManageRecords extends ListRecords
                 ->modalSubmitActionLabel(__('actions::actions.buttons.save'))
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
                 ->modalWidth('lg')
+                ->component(static::class) // For reactive fields in modal forms
                 ->action(function ($record, array $data) use ($modelClass, $page) {
                     // Get record ID - handle both object and array formats
                     $recordId = null;
@@ -356,7 +358,10 @@ abstract class ManageRecords extends ListRecords
      */
     public function getFormSchema(array $formData = []): \Laravilt\Schemas\Schema
     {
-        return $this->form(Schema::make());
+        $resource = static::getResource();
+        $modelClass = $resource::getModel();
+
+        return $this->form(Schema::make()->model($modelClass));
     }
 
     /**

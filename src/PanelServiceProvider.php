@@ -139,6 +139,11 @@ class PanelServiceProvider extends ServiceProvider
                     ->prefix($panel->getPath())
                     ->name($panel->getId().'.')
                     ->group(function () use ($panel) {
+                        // Register Select options search endpoint
+                        Route::get('_select/search', [Http\Controllers\SelectOptionsController::class, 'search'])
+                            ->name('select.search');
+                        Route::get('_select/options', [Http\Controllers\SelectOptionsController::class, 'getOptions'])
+                            ->name('select.options');
                         // Register cluster routes first (for pages that belong to clusters)
                         foreach ($panel->getClusters() as $clusterClass) {
                             $this->registerCustomClusterRoutes($clusterClass, $panel);

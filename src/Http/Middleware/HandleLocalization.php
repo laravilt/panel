@@ -36,7 +36,8 @@ class HandleLocalization
         'laravilt-panel::panel',     // Panel package
         'laravilt-auth::auth',       // Auth package
         'laravilt-support::support', // Support package
-        'laravilt-forms::fields',    // Forms package
+        'laravilt-forms::fields',    // Forms package (legacy)
+        'forms::forms',              // Forms package (new)
         'laravilt-schemas::schemas', // Schemas package
         'laravilt-ai::ai',           // AI package
         'tables::tables',            // Tables package
