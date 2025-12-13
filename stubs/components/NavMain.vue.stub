@@ -70,6 +70,47 @@ function getBadgeVariant(color?: string): 'default' | 'secondary' | 'destructive
 
 const page = usePage();
 
+// Computed current URL for reactivity
+const currentUrl = computed(() => page.url);
+
+// Extract path from URL (handles both full URLs and relative paths)
+function extractPath(url: string): string {
+    if (!url) return '';
+    try {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            const urlObj = new URL(url);
+            return urlObj.pathname;
+        }
+        // Remove query string and hash
+        return url.split('?')[0].split('#')[0];
+    } catch {
+        return url;
+    }
+}
+
+// Check if a nav item is active (handles regular URL matching and prefix matching for clusters)
+// Uses computed currentUrl for proper reactivity
+const isNavItemActive = (item: NavItem): boolean => {
+    const url = currentUrl.value;
+    const currentPath = extractPath(url);
+
+    // First check activeMatchPrefix for cluster-style matching
+    if (item.activeMatchPrefix) {
+        const prefix = extractPath(item.activeMatchPrefix).replace(/\/$/, '');
+        const normalizedCurrent = currentPath.replace(/\/$/, '');
+
+        // Check if current URL starts with the prefix
+        if (normalizedCurrent.startsWith(prefix) &&
+            (normalizedCurrent[prefix.length] === '/' ||
+             normalizedCurrent.length === prefix.length)) {
+            return true;
+        }
+    }
+
+    // Fall back to regular URL matching
+    return urlIsActive(item.url || item.href, url);
+};
+
 // Track open state for each group
 const openGroups = ref<Record<string, boolean>>({});
 
@@ -160,7 +201,7 @@ function shouldAnimate(title: string): boolean {
                                     <Badge
                                         v-if="subItem.badge || subItem.badgeCount"
                                         :variant="getBadgeVariant(subItem.badgeColor)"
-                                        class="h-5 min-w-5 px-1.5 text-xs ml-auto"
+                                        class="h-5 min-w-5 px-1.5 text-xs ml-auto me-1"
                                     >
                                         {{ subItem.badge || subItem.badgeCount }}
                                     </Badge>
@@ -207,7 +248,7 @@ function shouldAnimate(title: string): boolean {
                                             <Badge
                                                 v-if="subItem.badge || subItem.badgeCount"
                                                 :variant="getBadgeVariant(subItem.badgeColor)"
-                                                class="h-5 min-w-5 px-1.5 text-xs ml-auto"
+                                                class="h-5 min-w-5 px-1.5 text-xs ml-auto me-1"
                                             >
                                                 {{ subItem.badge || subItem.badgeCount }}
                                             </Badge>
@@ -223,7 +264,7 @@ function shouldAnimate(title: string): boolean {
                 <SidebarMenuItem v-else>
                     <SidebarMenuButton
                         as-child
-                        :is-active="urlIsActive(item.url || item.href, page.url)"
+                        :is-active="isNavItemActive(item)"
                         :tooltip="item.title"
                     >
                         <Link :href="item.url || item.href">
