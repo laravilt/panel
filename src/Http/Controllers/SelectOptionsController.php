@@ -41,14 +41,14 @@ class SelectOptionsController extends Controller
         $limit = min((int) $request->input('limit', 50), 100);
 
         // Validate required parameters
-        if (!$modelClass || !$relationship) {
+        if (! $modelClass || ! $relationship) {
             return response()->json([
                 'error' => 'Missing required parameters: model and relationship',
             ], 400);
         }
 
         // Validate model class exists
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return response()->json([
                 'error' => 'Model class not found',
             ], 400);
@@ -57,7 +57,7 @@ class SelectOptionsController extends Controller
         // Create model instance and get relationship
         $modelInstance = new $modelClass;
 
-        if (!method_exists($modelInstance, $relationship)) {
+        if (! method_exists($modelInstance, $relationship)) {
             return response()->json([
                 'error' => 'Relationship method not found',
             ], 400);
@@ -85,7 +85,7 @@ class SelectOptionsController extends Controller
 
             $query->where(function ($q) use ($searchableFields, $search) {
                 foreach ($searchableFields as $field) {
-                    $q->orWhere($field, 'like', '%' . $search . '%');
+                    $q->orWhere($field, 'like', '%'.$search.'%');
                 }
             });
         }
@@ -101,9 +101,9 @@ class SelectOptionsController extends Controller
             // If title attribute is email and we have name fields, make a nicer label
             if ($titleAttribute === 'email') {
                 if ($record->first_name || $record->last_name) {
-                    $label = trim($record->first_name . ' ' . $record->last_name) . ' (' . $record->email . ')';
+                    $label = trim($record->first_name.' '.$record->last_name).' ('.$record->email.')';
                 } elseif ($record->name) {
-                    $label = $record->name . ' (' . $record->email . ')';
+                    $label = $record->name.' ('.$record->email.')';
                 }
             }
 
@@ -131,14 +131,14 @@ class SelectOptionsController extends Controller
         $limit = min((int) $request->input('limit', 50), 100);
 
         // Validate required parameters
-        if (!$modelClass || !$relationship) {
+        if (! $modelClass || ! $relationship) {
             return response()->json([
                 'error' => 'Missing required parameters: model and relationship',
             ], 400);
         }
 
         // Validate model class exists
-        if (!class_exists($modelClass)) {
+        if (! class_exists($modelClass)) {
             return response()->json([
                 'error' => 'Model class not found',
             ], 400);
@@ -147,7 +147,7 @@ class SelectOptionsController extends Controller
         // Create model instance and get relationship
         $modelInstance = new $modelClass;
 
-        if (!method_exists($modelInstance, $relationship)) {
+        if (! method_exists($modelInstance, $relationship)) {
             return response()->json([
                 'error' => 'Relationship method not found',
             ], 400);
@@ -160,7 +160,7 @@ class SelectOptionsController extends Controller
         $query = $relatedModel::query();
 
         // If specific IDs are requested, get those
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             $query->whereIn($relatedModel->getKeyName(), (array) $ids);
         } else {
             // Otherwise get initial set (limited)
@@ -177,9 +177,9 @@ class SelectOptionsController extends Controller
             // If title attribute is email and we have name fields, make a nicer label
             if ($titleAttribute === 'email') {
                 if ($record->first_name || $record->last_name) {
-                    $label = trim($record->first_name . ' ' . $record->last_name) . ' (' . $record->email . ')';
+                    $label = trim($record->first_name.' '.$record->last_name).' ('.$record->email.')';
                 } elseif ($record->name) {
-                    $label = $record->name . ' (' . $record->email . ')';
+                    $label = $record->name.' ('.$record->email.')';
                 }
             }
 
@@ -208,13 +208,13 @@ class SelectOptionsController extends Controller
         $relationManager = $request->input('relationManager'); // For relation manager forms
 
         // If fetching by IDs and no resource context, use field name convention to look up directly
-        if (!empty($ids) && !$resourceSlug && $fieldName) {
+        if (! empty($ids) && ! $resourceSlug && $fieldName) {
             return $this->fetchOptionsByFieldName($fieldName, (array) $ids);
         }
 
         // Find the resource
         $panel = Panel::getCurrent();
-        if (!$panel) {
+        if (! $panel) {
             return response()->json(['error' => 'Panel not found'], 400);
         }
 
@@ -229,9 +229,9 @@ class SelectOptionsController extends Controller
         }
 
         // If no resource found, fall back to field name convention lookup
-        if (!$resourceClass) {
+        if (! $resourceClass) {
             // If we have specific IDs, fetch those
-            if (!empty($ids) && $fieldName) {
+            if (! empty($ids) && $fieldName) {
                 return $this->fetchOptionsByFieldName($fieldName, (array) $ids);
             }
 
@@ -244,14 +244,14 @@ class SelectOptionsController extends Controller
         }
 
         // Get the form schema - either from relation manager or resource
-        $schema = new \Laravilt\Schemas\Schema();
+        $schema = new \Laravilt\Schemas\Schema;
 
         if ($relationManager && class_exists($relationManager)) {
             // Get form from relation manager
             try {
                 // Create a dummy model instance for the relation manager
                 $modelClass = $resourceClass::getModel();
-                $dummyModel = new $modelClass();
+                $dummyModel = new $modelClass;
                 $manager = new $relationManager($dummyModel);
                 $schema = $manager->form($schema);
             } catch (\Exception $e) {
@@ -271,7 +271,7 @@ class SelectOptionsController extends Controller
             'schemaCount' => count($schema->getSchema()),
         ]);
 
-        if (!$field) {
+        if (! $field) {
             return response()->json(['error' => 'Field not found'], 400);
         }
 
@@ -291,12 +291,12 @@ class SelectOptionsController extends Controller
             $allOptions = $allOptions->all();
         }
 
-        if (!is_array($allOptions)) {
+        if (! is_array($allOptions)) {
             $allOptions = [];
         }
 
         // If specific IDs are requested, return only those options
-        if (!empty($ids)) {
+        if (! empty($ids)) {
             $ids = (array) $ids;
             $options = [];
             foreach ($ids as $id) {
@@ -325,10 +325,11 @@ class SelectOptionsController extends Controller
                     // Fallback: use ID as label
                     $options[] = [
                         'value' => $id,
-                        'label' => 'ID: ' . $id,
+                        'label' => 'ID: '.$id,
                     ];
                 }
             }
+
             return response()->json([
                 'options' => $options,
             ]);
@@ -385,7 +386,7 @@ class SelectOptionsController extends Controller
             ];
 
             foreach ($namespaces as $namespace) {
-                $fullClassName = $namespace . $modelName;
+                $fullClassName = $namespace.$modelName;
                 if (class_exists($fullClassName)) {
                     // Found the model class, fetch records
                     $records = $fullClassName::whereIn('id', $ids)->get();
@@ -411,10 +412,10 @@ class SelectOptionsController extends Controller
         // Add fallback for any IDs not found
         $foundIds = collect($options)->pluck('value')->toArray();
         foreach ($ids as $id) {
-            if (!in_array((string) $id, $foundIds)) {
+            if (! in_array((string) $id, $foundIds)) {
                 $options[] = [
                     'value' => (string) $id,
-                    'label' => 'ID: ' . $id,
+                    'label' => 'ID: '.$id,
                 ];
             }
         }
@@ -445,14 +446,14 @@ class SelectOptionsController extends Controller
             ];
 
             foreach ($namespaces as $namespace) {
-                $fullClassName = $namespace . $modelName;
+                $fullClassName = $namespace.$modelName;
                 if (class_exists($fullClassName)) {
                     // Build query
                     $query = $fullClassName::query();
 
                     // Apply search if provided
                     if ($search) {
-                        $model = new $fullClassName();
+                        $model = new $fullClassName;
                         $table = $model->getTable();
 
                         // Try common searchable fields
@@ -465,10 +466,10 @@ class SelectOptionsController extends Controller
                             }
                         }
 
-                        if (!empty($existingFields)) {
+                        if (! empty($existingFields)) {
                             $query->where(function ($q) use ($existingFields, $search) {
                                 foreach ($existingFields as $field) {
-                                    $q->orWhere($field, 'like', '%' . $search . '%');
+                                    $q->orWhere($field, 'like', '%'.$search.'%');
                                 }
                             });
                         }
@@ -527,7 +528,7 @@ class SelectOptionsController extends Controller
                 ];
 
                 foreach ($namespaces as $namespace) {
-                    $fullClassName = $namespace . $modelName;
+                    $fullClassName = $namespace.$modelName;
                     if (class_exists($fullClassName)) {
                         $model = $fullClassName::find($id);
                         if ($model) {
@@ -538,6 +539,7 @@ class SelectOptionsController extends Controller
                                     return (string) $model->{$attr};
                                 }
                             }
+
                             // Fallback to first string attribute
                             return (string) ($model->name ?? $model->title ?? $model->getKey());
                         }
@@ -545,7 +547,7 @@ class SelectOptionsController extends Controller
                 }
             }
         } catch (\Exception $e) {
-            \Log::warning('Failed to get label from database: ' . $e->getMessage());
+            \Log::warning('Failed to get label from database: '.$e->getMessage());
         }
 
         return null;
