@@ -4,11 +4,8 @@ namespace Laravilt\Panel\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
-use Laravilt\Panel\Contracts\HasTenants;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
 

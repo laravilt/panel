@@ -124,7 +124,7 @@ class TeamMembers extends Page
 
         if (method_exists($invitedUser, $pluralRelationship)) {
             $existingMembership = $invitedUser->{$pluralRelationship}()
-                ->where($tenant->getTable() . '.id', $tenant->getKey())
+                ->where($tenant->getTable().'.id', $tenant->getKey())
                 ->exists();
 
             if ($existingMembership) {
@@ -199,7 +199,8 @@ class TeamMembers extends Page
 
         if ((int) $memberId === (int) $user->id) {
             session()->forget('laravilt.tenant_id');
-            return redirect('/' . $panel->getPath());
+
+            return redirect('/'.$panel->getPath());
         }
 
         return back()->with('success', __('panel::panel.tenancy.settings.member_removed'));
@@ -243,7 +244,7 @@ class TeamMembers extends Page
 
         if (method_exists($user, $pluralRelationship)) {
             $membership = $user->{$pluralRelationship}()
-                ->where($tenant->getTable() . '.id', $tenant->getKey())
+                ->where($tenant->getTable().'.id', $tenant->getKey())
                 ->first();
 
             return $membership && ($membership->pivot->role ?? '') === 'owner';

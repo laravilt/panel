@@ -160,7 +160,7 @@ class SharePanelData
         // Get available tenants if user implements HasTenants
         $tenants = [];
         if ($user instanceof HasTenants) {
-            $tenants = $user->getTenants($panel)->map(function ($tenant) use ($currentTenant, $slugAttribute, $panel) {
+            $tenants = $user->getTenants($panel)->map(function ($tenant) use ($currentTenant, $slugAttribute) {
                 $name = method_exists($tenant, 'getTenantName')
                     ? $tenant->getTenantName()
                     : ($tenant->name ?? $tenant->{$slugAttribute});

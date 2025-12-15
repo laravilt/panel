@@ -66,6 +66,6 @@ class TenantSettings extends Cluster
         }
 
         // Default to team profile page
-        return redirect('/' . $panel->getPath() . '/tenant/settings/profile');
+        return redirect('/'.$panel->getPath().'/tenant/settings/profile');
     }
 }

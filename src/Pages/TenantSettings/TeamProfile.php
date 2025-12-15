@@ -131,7 +131,7 @@ class TeamProfile extends Page
 
         if (method_exists($user, $pluralRelationship)) {
             $membership = $user->{$pluralRelationship}()
-                ->where($tenant->getTable() . '.id', $tenant->getKey())
+                ->where($tenant->getTable().'.id', $tenant->getKey())
                 ->first();
 
             return $membership && ($membership->pivot->role ?? '') === 'owner';
