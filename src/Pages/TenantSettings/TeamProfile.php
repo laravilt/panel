@@ -6,8 +6,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
-use Laravilt\Forms\Components\FileUpload;
-use Laravilt\Forms\Components\Textarea;
 use Laravilt\Forms\Components\TextInput;
 use Laravilt\Panel\Clusters\TenantSettings;
 use Laravilt\Panel\Enums\PageLayout;

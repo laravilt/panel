@@ -3,7 +3,6 @@
 namespace Laravilt\Panel\Pages\Tenancy;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
 use Laravilt\Forms\Components\FileUpload;

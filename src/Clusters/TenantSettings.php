@@ -4,7 +4,6 @@ namespace Laravilt\Panel\Clusters;
 
 use Illuminate\Http\Request;
 use Laravilt\Panel\Cluster;
-use Laravilt\Panel\Facades\Laravilt;
 
 class TenantSettings extends Cluster
 {
