@@ -40,7 +40,9 @@ class TenantSettings extends Cluster
     {
         $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
 
-        return $panel?->hasTenancy() && $panel?->hasTenantProfile() && Laravilt::hasTenant();
+        // Only check panel configuration, not tenant existence
+        // Tenant existence is checked by the middleware
+        return $panel?->hasTenancy() && $panel?->hasTenantProfile();
     }
 
     /**
@@ -55,17 +57,7 @@ class TenantSettings extends Cluster
             abort(404);
         }
 
-        // Get pages for this cluster
-        $pages = $panel->getPages();
-
-        // Find the first page that belongs to this cluster
-        foreach ($pages as $page) {
-            if (method_exists($page, 'getCluster') && $page::getCluster() === static::class) {
-                return redirect($page::getUrl());
-            }
-        }
-
-        // Default to team profile page
-        return redirect('/'.$panel->getPath().'/tenant/settings/profile');
+        // Redirect to team profile page (first page in the cluster)
+        return redirect()->to('/'.$panel->getPath().'/tenant/settings/profile');
     }
 }

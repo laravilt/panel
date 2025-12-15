@@ -42,6 +42,7 @@ const page = usePage<{
     panel?: {
         id: string;
         path: string;
+        brandLogo?: string | null;
         hasTenancy: boolean;
         tenancy?: TenancyData;
     };
@@ -52,6 +53,7 @@ const currentTenant = computed(() => tenancy.value?.current);
 const tenants = computed(() => tenancy.value?.tenants || []);
 const canRegister = computed(() => tenancy.value?.canRegister || false);
 const canEditProfile = computed(() => tenancy.value?.canEditProfile || false);
+const panelLogo = computed(() => page.props?.panel?.brandLogo);
 
 const isSwitching = ref(false);
 
@@ -103,6 +105,7 @@ const goToCreateTeam = () => {
                     >
                         <Avatar class="h-8 w-8 rounded-md">
                             <AvatarImage v-if="currentTenant?.avatar" :src="currentTenant.avatar" />
+                            <AvatarImage v-else-if="panelLogo" :src="panelLogo" />
                             <AvatarFallback class="rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
                                 <Building2 v-if="!currentTenant" class="h-4 w-4" />
                                 <span v-else>{{ getInitials(currentTenant.name) }}</span>
@@ -137,6 +140,7 @@ const goToCreateTeam = () => {
                     >
                         <Avatar class="h-6 w-6 rounded-md">
                             <AvatarImage v-if="tenant.avatar" :src="tenant.avatar" />
+                            <AvatarImage v-else-if="panelLogo" :src="panelLogo" />
                             <AvatarFallback class="rounded-md text-xs">
                                 {{ getInitials(tenant.name) }}
                             </AvatarFallback>

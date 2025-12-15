@@ -172,7 +172,25 @@ class PanelServiceProvider extends ServiceProvider
 
             // Register global /login route that redirects to default panel
             $this->registerDefaultLoginRoute($registry);
+
+            // Register invitation routes (global, signed URLs)
+            $this->registerInvitationRoutes();
         });
+    }
+
+    /**
+     * Register global invitation routes for accept/decline team invitations.
+     */
+    protected function registerInvitationRoutes(): void
+    {
+        Route::middleware(['web'])
+            ->group(function () {
+                Route::get('invitation/{team}/{user}/{panel}/accept', [Http\Controllers\InvitationController::class, 'accept'])
+                    ->name('laravilt.invitation.accept');
+
+                Route::get('invitation/{team}/{user}/{panel}/decline', [Http\Controllers\InvitationController::class, 'decline'])
+                    ->name('laravilt.invitation.decline');
+            });
     }
 
     /**
@@ -1241,11 +1259,11 @@ class PanelServiceProvider extends ServiceProvider
                 // Custom page class - use its routes
                 $this->registerCustomTenantPage($registrationPage, 'tenant/register', 'tenant.register', $panel);
             } else {
-                // Default registration controller
-                Route::get('tenant/register', [Http\Controllers\TenantRegistrationController::class, 'create'])
+                // Default: Use the RegisterTenant page class
+                Route::get('tenant/register', [Pages\Tenancy\RegisterTenant::class, 'create'])
                     ->name('tenant.register');
 
-                Route::post('tenant/register', [Http\Controllers\TenantRegistrationController::class, 'store'])
+                Route::post('tenant/register', [Pages\Tenancy\RegisterTenant::class, 'store'])
                     ->name('tenant.register.store');
             }
         }
@@ -1259,26 +1277,50 @@ class PanelServiceProvider extends ServiceProvider
                 // Custom page class - use its routes
                 $this->registerCustomTenantPage($profilePage, 'tenant/settings', 'tenant.settings', $panel);
             } else {
-                // Default settings controller
-                Route::get('tenant/settings', [Http\Controllers\TenantSettingsController::class, 'show'])
-                    ->name('tenant.settings');
-
-                Route::patch('tenant/settings/name', [Http\Controllers\TenantSettingsController::class, 'updateName'])
-                    ->name('tenant.settings.update-name');
-
-                Route::post('tenant/settings/members', [Http\Controllers\TenantSettingsController::class, 'inviteMember'])
-                    ->name('tenant.settings.invite-member');
-
-                Route::patch('tenant/settings/members/{member}/role', [Http\Controllers\TenantSettingsController::class, 'updateMemberRole'])
-                    ->name('tenant.settings.update-member-role');
-
-                Route::delete('tenant/settings/members/{member}', [Http\Controllers\TenantSettingsController::class, 'removeMember'])
-                    ->name('tenant.settings.remove-member');
-
-                Route::delete('tenant/settings', [Http\Controllers\TenantSettingsController::class, 'destroy'])
-                    ->name('tenant.settings.destroy');
+                // Default: Use the cluster-based pages
+                $this->registerTenantSettingsCluster($panel);
             }
         }
+    }
+
+    /**
+     * Register the TenantSettings cluster and its pages.
+     */
+    protected function registerTenantSettingsCluster(Panel $panel): void
+    {
+        // Register pages with the panel for cluster navigation
+        $panel->pages([
+            Clusters\TenantSettings::class,
+            Pages\TenantSettings\TeamProfile::class,
+            Pages\TenantSettings\TeamMembers::class,
+        ]);
+
+        // Register cluster index route (redirects to first page)
+        Route::get('tenant/settings', [Clusters\TenantSettings::class, 'create'])
+            ->name('tenant.settings');
+
+        // Team Profile page routes
+        Route::get('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'create'])
+            ->name('tenant.settings.profile');
+
+        Route::post('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'store'])
+            ->name('tenant.settings.profile.store');
+
+        Route::delete('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'destroy'])
+            ->name('tenant.settings.profile.destroy');
+
+        // Team Members page routes
+        Route::get('tenant/settings/members', [Pages\TenantSettings\TeamMembers::class, 'create'])
+            ->name('tenant.settings.members');
+
+        Route::post('tenant/settings/members', [Pages\TenantSettings\TeamMembers::class, 'store'])
+            ->name('tenant.settings.members.store');
+
+        Route::patch('tenant/settings/members/{member}/role', [Pages\TenantSettings\TeamMembers::class, 'updateRole'])
+            ->name('tenant.settings.members.update-role');
+
+        Route::delete('tenant/settings/members/{member}', [Pages\TenantSettings\TeamMembers::class, 'destroy'])
+            ->name('tenant.settings.members.destroy');
     }
 
     /**

@@ -4,10 +4,15 @@ namespace Laravilt\Panel\Pages\TenantSettings;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Laravilt\Actions\Action;
+use Laravilt\Forms\Components\Checkbox;
+use Laravilt\Forms\Components\Select;
+use Laravilt\Forms\Components\TextInput;
 use Laravilt\Panel\Clusters\TenantSettings;
 use Laravilt\Panel\Enums\PageLayout;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
+use Laravilt\Panel\Notifications\TeamInvitation;
 use Laravilt\Panel\Pages\Page;
 
 class TeamMembers extends Page
@@ -16,6 +21,8 @@ class TeamMembers extends Page
 
     protected static ?string $cluster = TenantSettings::class;
 
+    protected static string $view = 'Tenant/TeamMembers';
+
     protected static ?string $slug = 'members';
 
     protected static ?string $navigationIcon = 'users';
@@ -23,8 +30,6 @@ class TeamMembers extends Page
     protected static bool $shouldRegisterNavigation = true;
 
     protected static ?int $navigationSort = 2;
-
-    protected ?string $component = 'Tenant/Settings/TeamMembers';
 
     public static function getTitle(): string
     {
@@ -53,67 +58,83 @@ class TeamMembers extends Page
 
     public static function canAccess(): bool
     {
+        // Delegate to cluster - tenant existence is checked by middleware
         return TenantSettings::canAccess();
     }
 
     protected function getSchema(): array
     {
+        // The members list is passed via getInertiaProps()
+        // The schema is for the "add member" form inside the modal action
         return [];
     }
 
     protected function getActions(): array
     {
-        return [];
-    }
-
-    protected function getInertiaProps(): array
-    {
-        $panel = Panel::getCurrent();
         $tenant = Laravilt::getTenant();
-        $user = request()->user();
+        $isOwner = $this->isTeamOwner($tenant, request()->user());
 
-        $isOwner = $this->isTeamOwner($tenant, $user);
-        $members = $this->getTeamMembers($tenant);
-        $availableRoles = $this->getAvailableRoles();
+        if (! $isOwner) {
+            return [];
+        }
 
         return [
-            'team' => [
-                'id' => $tenant->getKey(),
-                'name' => $tenant->name,
-            ],
-            'members' => $members,
-            'isOwner' => $isOwner,
-            'availableRoles' => $availableRoles,
-            'permissions' => [
-                'canAddTeamMembers' => $isOwner,
-                'canRemoveTeamMembers' => $isOwner,
-            ],
+            Action::make('invite-member')
+                ->label(__('panel::panel.tenancy.settings.invite_member'))
+                ->icon('user-plus')
+                ->modalHeading(__('panel::panel.tenancy.settings.invite_member'))
+                ->modalDescription(__('panel::panel.tenancy.settings.invite_member_description'))
+                ->modalSubmitActionLabel(__('panel::panel.tenancy.settings.invite_member'))
+                ->modalFormSchema([
+                    TextInput::make('email')
+                        ->label(__('panel::panel.tenancy.settings.email'))
+                        ->email()
+                        ->required()
+                        ->placeholder(__('panel::panel.tenancy.settings.email_placeholder')),
+
+                    Select::make('role')
+                        ->label(__('panel::panel.tenancy.settings.role'))
+                        ->options([
+                            'admin' => __('panel::panel.tenancy.roles.admin'),
+                            'editor' => __('panel::panel.tenancy.roles.editor'),
+                            'member' => __('panel::panel.tenancy.roles.member'),
+                        ])
+                        ->default('member')
+                        ->required(),
+
+                    Checkbox::make('send_email')
+                        ->label(__('panel::panel.tenancy.settings.send_email_notification'))
+                        ->default(true),
+
+                    Checkbox::make('send_database')
+                        ->label(__('panel::panel.tenancy.settings.send_notification_center'))
+                        ->default(true),
+                ])
+                ->action(function (array $data) {
+                    return $this->inviteTeamMember($data);
+                }),
         ];
     }
 
     /**
      * Invite a new team member.
      */
-    public function store(Request $request)
+    public function inviteTeamMember(array $data): mixed
     {
         $panel = Panel::getCurrent();
         $tenant = Laravilt::getTenant();
+        $inviter = request()->user();
 
         if (! $tenant) {
             return back()->withErrors(['team' => 'No team selected.']);
         }
 
-        if (! $this->isTeamOwner($tenant, $request->user())) {
+        if (! $this->isTeamOwner($tenant, $inviter)) {
             return back()->withErrors(['team' => 'You are not authorized to invite members.']);
         }
 
-        $validated = $request->validate([
-            'email' => ['required', 'email'],
-            'role' => ['required', 'string'],
-        ]);
-
         $userModel = config('auth.providers.users.model', \App\Models\User::class);
-        $invitedUser = $userModel::where('email', $validated['email'])->first();
+        $invitedUser = $userModel::where('email', $data['email'])->first();
 
         if (! $invitedUser) {
             return back()->withErrors(['email' => __('panel::panel.tenancy.settings.user_not_found')]);
@@ -131,10 +152,42 @@ class TeamMembers extends Page
                 return back()->withErrors(['email' => __('panel::panel.tenancy.settings.already_member')]);
             }
 
-            $invitedUser->{$pluralRelationship}()->attach($tenant->getKey(), ['role' => $validated['role']]);
+            $invitedUser->{$pluralRelationship}()->attach($tenant->getKey(), ['role' => $data['role']]);
         }
 
-        return back()->with('success', __('panel::panel.tenancy.settings.member_added'));
+        // Send notification to the invited user
+        $sendEmail = $data['send_email'] ?? true;
+        $sendDatabase = $data['send_database'] ?? true;
+
+        if ($sendEmail || $sendDatabase) {
+            $invitedUser->notify(new TeamInvitation(
+                team: $tenant,
+                inviter: $inviter,
+                role: $data['role'],
+                panelPath: $panel->getPath(),
+                sendEmail: $sendEmail,
+                sendDatabase: $sendDatabase
+            ));
+        }
+
+        notify(__('panel::panel.tenancy.settings.member_invited'));
+
+        return back();
+    }
+
+    /**
+     * Handle POST request to add team member.
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'email'],
+            'role' => ['required', 'string'],
+            'send_email' => ['nullable', 'boolean'],
+            'send_database' => ['nullable', 'boolean'],
+        ]);
+
+        return $this->inviteTeamMember($validated);
     }
 
     /**
@@ -165,7 +218,9 @@ class TeamMembers extends Page
             ]);
         }
 
-        return back()->with('success', __('panel::panel.tenancy.settings.role_updated'));
+        notify(__('panel::panel.tenancy.settings.role_updated'));
+
+        return back();
     }
 
     /**
@@ -203,11 +258,48 @@ class TeamMembers extends Page
             return redirect('/'.$panel->getPath());
         }
 
-        return back()->with('success', __('panel::panel.tenancy.settings.member_removed'));
+        notify(__('panel::panel.tenancy.settings.member_removed'));
+
+        return back();
+    }
+
+    protected function getInertiaProps(): array
+    {
+        $panel = Panel::getCurrent();
+        $tenant = Laravilt::getTenant();
+        $user = request()->user();
+
+        $isOwner = $this->isTeamOwner($tenant, $user);
+        $members = $this->getTeamMembers($tenant);
+        $availableRoles = $this->getAvailableRoles();
+
+        return [
+            'team' => [
+                'id' => $tenant->getKey(),
+                'name' => $tenant->name,
+            ],
+            'members' => $members,
+            'isOwner' => $isOwner,
+            'availableRoles' => $availableRoles,
+            'permissions' => [
+                'canAddTeamMembers' => $isOwner,
+                'canRemoveTeamMembers' => $isOwner,
+                'canUpdateMemberRole' => $isOwner,
+            ],
+            'routes' => [
+                'addMember' => '/'.$panel->getPath().'/tenant/settings/members',
+                'updateRole' => '/'.$panel->getPath().'/tenant/settings/members/{id}/role',
+                'removeMember' => '/'.$panel->getPath().'/tenant/settings/members/{id}',
+            ],
+        ];
     }
 
     protected function getTeamMembers($tenant): array
     {
+        if (! $tenant) {
+            return [];
+        }
+
         $membersRelationship = Str::plural('user');
 
         if (! method_exists($tenant, $membersRelationship)) {
@@ -230,7 +322,7 @@ class TeamMembers extends Page
 
     protected function isTeamOwner($tenant, $user): bool
     {
-        if (! $user) {
+        if (! $user || ! $tenant) {
             return false;
         }
 
