@@ -26,7 +26,7 @@ class InvitationController extends Controller
 
         // Verify the invitation is for the current user
         if (! $user || (int) $user->id !== (int) $userId) {
-            return redirect('/' . $panelPath . '/login')
+            return redirect('/'.$panelPath.'/login')
                 ->withErrors(['email' => __('panel::panel.tenancy.notifications.login_required')]);
         }
 
@@ -59,7 +59,7 @@ class InvitationController extends Controller
 
                 notify(__('panel::panel.tenancy.notifications.already_member'));
 
-                return redirect('/' . $panelPath);
+                return redirect('/'.$panelPath);
             }
         }
 
@@ -68,7 +68,7 @@ class InvitationController extends Controller
         // Set the team as the current tenant and redirect
         session(['laravilt.tenant_id' => $team->getKey()]);
 
-        return redirect('/' . $panelPath);
+        return redirect('/'.$panelPath);
     }
 
     /**
@@ -88,7 +88,7 @@ class InvitationController extends Controller
 
         // Verify the invitation is for the current user
         if (! $user || (int) $user->id !== (int) $userId) {
-            return redirect('/' . $panelPath . '/login')
+            return redirect('/'.$panelPath.'/login')
                 ->withErrors(['email' => __('panel::panel.tenancy.notifications.login_required')]);
         }
 
@@ -116,6 +116,6 @@ class InvitationController extends Controller
 
         notify(__('panel::panel.tenancy.notifications.invitation_declined'));
 
-        return redirect('/' . $panelPath);
+        return redirect('/'.$panelPath);
     }
 }

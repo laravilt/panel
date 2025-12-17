@@ -224,21 +224,125 @@ abstract class Resource
      *
      * When tenancy is enabled and this resource is scoped to tenant,
      * the query will automatically filter by the current tenant.
+     * If the tenant has 'show_unassigned_records' setting enabled,
+     * records with null team_id will also be included.
      */
     public static function getEloquentQuery(): Builder
     {
         $query = static::getModel()::query();
 
-        // Apply tenant scoping if enabled
-        if (static::isScopedToTenant() && Laravilt::isTenancyEnabled() && Laravilt::hasTenant()) {
-            $ownershipColumn = static::getTenantOwnershipColumn();
+        // Skip tenant scoping in multi-database mode - data is already isolated by database
+        if (Laravilt::isMultiDatabaseTenancy()) {
+            return $query;
+        }
 
-            if ($ownershipColumn) {
-                $query->where($ownershipColumn, Laravilt::getTenantId());
+        // Apply tenant scoping if enabled (single-database mode only)
+        if (static::isScopedToTenant() && Laravilt::isTenancyEnabled() && Laravilt::hasTenant()) {
+            $tenantId = Laravilt::getTenantId();
+            $ownershipColumn = static::getTenantOwnershipColumn();
+            $showUnassigned = static::shouldShowUnassignedRecords();
+
+            // Check if table has the ownership column (direct relationship like team_id)
+            if ($ownershipColumn && static::modelHasColumn($ownershipColumn)) {
+                if ($showUnassigned) {
+                    // Include both tenant's records and unassigned records
+                    $query->where(function ($q) use ($ownershipColumn, $tenantId) {
+                        $q->where($ownershipColumn, $tenantId)
+                            ->orWhereNull($ownershipColumn);
+                    });
+                } else {
+                    $query->where($ownershipColumn, $tenantId);
+                }
+            }
+            // Check for many-to-many relationship with tenant model
+            elseif (static::hasTenantManyToManyRelationship()) {
+                $relationshipName = static::getTenantManyToManyRelationshipName();
+                if ($showUnassigned) {
+                    // Include both tenant's records and records with no tenant associations
+                    $query->where(function ($q) use ($relationshipName, $tenantId) {
+                        $q->whereHas($relationshipName, function ($subQ) use ($tenantId) {
+                            $subQ->where((new (Laravilt::getTenantModel()))->getTable().'.id', $tenantId);
+                        })->orWhereDoesntHave($relationshipName);
+                    });
+                } else {
+                    $query->whereHas($relationshipName, function ($q) use ($tenantId) {
+                        $q->where((new (Laravilt::getTenantModel()))->getTable().'.id', $tenantId);
+                    });
+                }
             }
         }
 
         return $query;
+    }
+
+    /**
+     * Check if the current tenant allows showing unassigned records.
+     */
+    protected static function shouldShowUnassignedRecords(): bool
+    {
+        $tenant = Laravilt::getTenant();
+
+        if (! $tenant) {
+            return false;
+        }
+
+        // Check if tenant model has the shouldShowUnassignedRecords method
+        if (method_exists($tenant, 'shouldShowUnassignedRecords')) {
+            return $tenant->shouldShowUnassignedRecords();
+        }
+
+        // Fall back to checking settings array directly
+        if (isset($tenant->settings) && is_array($tenant->settings)) {
+            return $tenant->settings['show_unassigned_records'] ?? false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if the model's table has a specific column.
+     */
+    protected static function modelHasColumn(string $column): bool
+    {
+        try {
+            $model = new (static::getModel());
+            $table = $model->getTable();
+
+            return \Illuminate\Support\Facades\Schema::hasColumn($table, $column);
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Check if the model has a many-to-many relationship with the tenant model.
+     */
+    protected static function hasTenantManyToManyRelationship(): bool
+    {
+        $relationshipName = static::getTenantManyToManyRelationshipName();
+
+        if (! $relationshipName) {
+            return false;
+        }
+
+        try {
+            $model = new (static::getModel());
+
+            return method_exists($model, $relationshipName) &&
+                   $model->{$relationshipName}() instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get the many-to-many relationship name for tenant scoping.
+     * Override this method if your model uses a different relationship name.
+     */
+    protected static function getTenantManyToManyRelationshipName(): ?string
+    {
+        // Default to 'teams' - override in resource if different
+        return 'teams';
     }
 
     /**
@@ -288,10 +392,37 @@ abstract class Resource
             return;
         }
 
+        $tenantId = Laravilt::getTenantId();
         $ownershipColumn = static::getTenantOwnershipColumn();
 
-        if ($ownershipColumn && ! isset($record->{$ownershipColumn})) {
-            $record->{$ownershipColumn} = Laravilt::getTenantId();
+        // Check for direct column (team_id) - always set if column exists and value is empty
+        if ($ownershipColumn && static::modelHasColumn($ownershipColumn)) {
+            $currentValue = $record->{$ownershipColumn};
+            // Set tenant if value is null, empty string, or not set
+            if (empty($currentValue) && $currentValue !== 0) {
+                $record->{$ownershipColumn} = $tenantId;
+            }
+        }
+    }
+
+    /**
+     * Associate a record with the current tenant via many-to-many relationship.
+     * Call this after the record is saved.
+     */
+    public static function associateRecordWithTenantManyToMany(Model $record): void
+    {
+        if (! static::isScopedToTenant() || ! Laravilt::isTenancyEnabled() || ! Laravilt::hasTenant()) {
+            return;
+        }
+
+        if (static::hasTenantManyToManyRelationship()) {
+            $relationshipName = static::getTenantManyToManyRelationshipName();
+            $tenantId = Laravilt::getTenantId();
+
+            // Always attach current tenant if not already attached
+            if (! $record->{$relationshipName}()->where('teams.id', $tenantId)->exists()) {
+                $record->{$relationshipName}()->attach($tenantId);
+            }
         }
     }
 

@@ -14,7 +14,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Building2, Check, ChevronsUpDown, Plus, Settings } from 'lucide-vue-next';
 import { useLocalization } from '@/composables/useLocalization';
 
@@ -25,6 +24,7 @@ interface Tenant {
     name: string;
     slug: string;
     avatar?: string | null;
+    url?: string | null;
     is_current: boolean;
 }
 
@@ -36,6 +36,8 @@ interface TenancyData {
     hasTenantMenu: boolean;
     menuItems: Record<string, any>;
     switchUrl: string;
+    isMultiDatabase: boolean;
+    baseDomain?: string | null;
 }
 
 const page = usePage<{
@@ -54,6 +56,7 @@ const tenants = computed(() => tenancy.value?.tenants || []);
 const canRegister = computed(() => tenancy.value?.canRegister || false);
 const canEditProfile = computed(() => tenancy.value?.canEditProfile || false);
 const panelLogo = computed(() => page.props?.panel?.brandLogo);
+const isMultiDatabase = computed(() => tenancy.value?.isMultiDatabase || false);
 
 const isSwitching = ref(false);
 
@@ -73,6 +76,13 @@ const switchTenant = async (tenant: Tenant) => {
 
     isSwitching.value = true;
 
+    // For multi-database tenancy, redirect to the tenant's subdomain URL
+    if (isMultiDatabase.value && tenant.url) {
+        window.location.href = tenant.url;
+        return;
+    }
+
+    // For single-database tenancy, use POST to switch tenant in session
     router.post(
         tenancy.value?.switchUrl || '',
         { tenant_id: tenant.id },
@@ -90,6 +100,15 @@ const goToSettings = () => {
 };
 
 const goToCreateTeam = () => {
+    // For multi-database tenancy, registration should be on the main domain
+    if (isMultiDatabase.value) {
+        const baseDomain = page.props?.panel?.tenancy?.baseDomain;
+        if (baseDomain) {
+            const scheme = window.location.protocol;
+            window.location.href = `${scheme}//${baseDomain}/${panelPath.value}/tenant/register`;
+            return;
+        }
+    }
     router.visit(`/${panelPath.value}/tenant/register`);
 };
 </script>
@@ -103,14 +122,23 @@ const goToCreateTeam = () => {
                         size="lg"
                         class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                     >
-                        <Avatar class="h-8 w-8 rounded-md">
-                            <AvatarImage v-if="currentTenant?.avatar" :src="currentTenant.avatar" />
-                            <AvatarImage v-else-if="panelLogo" :src="panelLogo" />
-                            <AvatarFallback class="rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                                <Building2 v-if="!currentTenant" class="h-4 w-4" />
-                                <span v-else>{{ getInitials(currentTenant.name) }}</span>
-                            </AvatarFallback>
-                        </Avatar>
+                        <div class="relative flex h-8 w-8 shrink-0 overflow-hidden rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                            <img
+                                v-if="currentTenant?.avatar"
+                                :src="currentTenant.avatar"
+                                :alt="currentTenant?.name"
+                                class="h-full w-full object-cover"
+                            />
+                            <template v-else-if="!currentTenant">
+                                <img v-if="panelLogo" :src="panelLogo" class="h-full w-full p-1.5 object-contain" />
+                                <Building2 v-else class="h-full w-full p-2" />
+                            </template>
+                            <template v-else>
+                                <!-- Current tenant exists but has no avatar -->
+                                <img v-if="panelLogo" :src="panelLogo" :alt="currentTenant.name" class="h-full w-full p-1.5 object-contain" />
+                                <span v-else class="flex h-full w-full items-center justify-center text-sm font-medium">{{ getInitials(currentTenant.name) }}</span>
+                            </template>
+                        </div>
                         <div class="grid flex-1 text-start text-sm leading-tight">
                             <span class="truncate font-semibold">
                                 {{ currentTenant?.name || trans('panel::panel.tenancy.select_tenant') }}
@@ -138,13 +166,28 @@ const goToCreateTeam = () => {
                         :class="{ 'bg-accent': tenant.is_current }"
                         @click="switchTenant(tenant)"
                     >
-                        <Avatar class="h-6 w-6 rounded-md">
-                            <AvatarImage v-if="tenant.avatar" :src="tenant.avatar" />
-                            <AvatarImage v-else-if="panelLogo" :src="panelLogo" />
-                            <AvatarFallback class="rounded-md text-xs">
-                                {{ getInitials(tenant.name) }}
-                            </AvatarFallback>
-                        </Avatar>
+                        <div class="relative flex h-6 w-6 shrink-0 overflow-hidden rounded-md bg-sidebar-primary">
+                            <img
+                                v-if="tenant.avatar"
+                                :src="tenant.avatar"
+                                :alt="tenant.name"
+                                class="h-full w-full object-cover"
+                            />
+                            <template v-else>
+                                <img
+                                    v-if="panelLogo"
+                                    :src="panelLogo"
+                                    :alt="tenant.name"
+                                    class="h-full w-full p-1 object-contain"
+                                />
+                                <span
+                                    v-else
+                                    class="flex h-full w-full items-center justify-center text-xs text-sidebar-primary-foreground"
+                                >
+                                    {{ getInitials(tenant.name) }}
+                                </span>
+                            </template>
+                        </div>
                         <span class="flex-1 truncate">{{ tenant.name }}</span>
                         <Check v-if="tenant.is_current" class="h-4 w-4" />
                     </DropdownMenuItem>

@@ -3,7 +3,6 @@
 namespace Laravilt\Panel\Pages\Tenancy;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
 use Laravilt\Forms\Components\FileUpload;
@@ -12,6 +11,7 @@ use Laravilt\Forms\Components\TextInput;
 use Laravilt\Panel\Enums\PageLayout;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
+use Laravilt\Panel\Models\Domain;
 use Laravilt\Panel\Pages\Page;
 use Laravilt\Schemas\Schema;
 use Laravilt\Support\Utilities\Get;
@@ -185,15 +185,37 @@ class RegisterTenant extends Page
             $tenant->owner_id = $user->id;
         }
 
-        $tenant->save();
+        // Handle avatar from form data (FileUpload component returns file path or array)
+        if (! empty($data['avatar']) && $this->tenantHasAttribute($tenant, 'avatar')) {
+            $avatarValue = $data['avatar'];
 
-        // Handle avatar upload after save (need tenant ID for path)
-        if ($request->hasFile('avatar') && $this->tenantHasAttribute($tenant, 'avatar')) {
-            $avatarPath = $this->uploadAvatar($request->file('avatar'), $tenant);
+            // FileUpload may return array with file info or direct path string
+            if (is_array($avatarValue)) {
+                // Get the first file path if it's an array
+                $avatarPath = $avatarValue[0] ?? ($avatarValue['path'] ?? null);
+            } else {
+                $avatarPath = $avatarValue;
+            }
+
             if ($avatarPath) {
                 $tenant->avatar = $avatarPath;
-                $tenant->save();
             }
+        }
+
+        $tenant->save();
+
+        // For multi-database tenancy, create database, run migrations, and create domain record
+        if ($panel->isMultiDatabaseTenancy()) {
+            // Create the tenant database
+            $multiDbManager = app(\Laravilt\Panel\Tenancy\MultiDatabaseManager::class);
+            $multiDbManager->createDatabase($tenant);
+
+            // Run migrations on the tenant database
+            $multiDbManager->migrateTenant($tenant);
+
+            // Create domain record for subdomain routing
+            $baseDomain = $panel->getTenantDomain();
+            Domain::createSubdomain($tenant, $slug, $baseDomain, true);
         }
 
         // Attach user to tenant
@@ -215,6 +237,14 @@ class RegisterTenant extends Page
         Laravilt::setTenant($tenant);
 
         notify(__('panel::panel.tenancy.tenant_created'));
+
+        // For multi-database tenancy, redirect to tenant subdomain
+        if ($panel->isMultiDatabaseTenancy()) {
+            $tenantUrl = $panel->getTenantUrl($tenant);
+
+            // Return redirect URL for frontend to handle (cross-domain redirect)
+            return ['redirect' => $tenantUrl];
+        }
 
         return redirect('/'.$panel->getPath());
     }

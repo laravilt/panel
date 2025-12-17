@@ -983,6 +983,21 @@ trait HasAuth
      */
     public function registerAuthRoutes(): void
     {
+        // Register subdomain auth routes FIRST if multi-database tenancy is enabled
+        // This ensures subdomain routes have higher priority than central routes
+        if ($this->isMultiDatabaseTenancy()) {
+            $this->registerSubdomainAuthRoutes();
+        }
+
+        // Register central domain auth routes
+        $this->registerCentralAuthRoutes();
+    }
+
+    /**
+     * Register central domain auth routes.
+     */
+    protected function registerCentralAuthRoutes(): void
+    {
         Route::middleware([
             'web',
             \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
@@ -1139,11 +1154,13 @@ trait HasAuth
 
         // Authenticated routes
         // IMPORTANT: IdentifyPanel must come BEFORE 'panel.auth' so that redirectTo() knows the current panel
+        // IdentifyTenant must come BEFORE SharePanelData so tenant is set before sharing to frontend
         $authenticatedMiddleware = array_merge(
             ['web'],
             [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
             ['panel.auth'],
             [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
+            [\Laravilt\Panel\Middleware\IdentifyTenant::class],
             [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
         );
 
@@ -1480,6 +1497,276 @@ trait HasAuth
 
                 \Illuminate\Support\Facades\Route::delete("{$passkeysPath}/{credentialId}", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'destroy'])
                     ->name($this->getId().'.passkeys.destroy');
+            }
+        }
+    }
+
+    /**
+     * Register subdomain auth routes for multi-database tenancy.
+     */
+    protected function registerSubdomainAuthRoutes(): void
+    {
+        $domain = $this->getTenantDomain();
+        if (! $domain) {
+            return;
+        }
+
+        // Use 'subdomain' prefix to avoid conflicts with tenant management routes
+        // e.g., admin.subdomain.login instead of admin.tenant.login
+        $namePrefix = $this->getId().'.subdomain';
+
+        // Guest routes (login, register, password reset, etc.)
+        Route::middleware([
+            'web',
+            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
+            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
+            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
+            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+        ])
+            ->domain('{tenant}.'.$domain)
+            ->prefix($this->getPath())
+            ->group(function () use ($namePrefix) {
+                // Login routes
+                if ($this->hasLogin() && $loginPage = $this->getLoginPage()) {
+                    Route::get($this->getLoginPath(), [$loginPage, 'create'])
+                        ->middleware('guest')
+                        ->name($namePrefix.'.login');
+
+                    Route::post($this->getLoginPath(), [$loginPage, 'store'])
+                        ->name($namePrefix.'.login.store');
+                }
+
+                // Registration routes
+                if ($this->hasRegistration() && $registerPage = $this->getRegisterPage()) {
+                    Route::get($this->getRegisterPath(), [$registerPage, 'create'])
+                        ->middleware('guest')
+                        ->name($namePrefix.'.register');
+
+                    Route::post($this->getRegisterPath(), [$registerPage, 'store'])
+                        ->name($namePrefix.'.register.store');
+                }
+
+                // Password reset routes
+                if ($this->hasPasswordReset()) {
+                    if ($passwordResetPage = $this->getPasswordResetPage()) {
+                        Route::get($this->getPasswordResetPath(), [$passwordResetPage, 'create'])
+                            ->name($namePrefix.'.password.request');
+
+                        Route::post($this->getPasswordResetPath(), [$passwordResetPage, 'store'])
+                            ->name($namePrefix.'.password.email');
+                    }
+
+                    if ($resetPasswordPage = $this->getResetPasswordPage()) {
+                        Route::get($this->getResetPasswordPath().'/{token}', [$resetPasswordPage, 'create'])
+                            ->name($namePrefix.'.password.reset');
+
+                        Route::post($this->getResetPasswordPath(), [$resetPasswordPage, 'store'])
+                            ->name($namePrefix.'.password.update');
+                    }
+                }
+
+                // Email verification routes
+                if ($this->hasEmailVerification() && $emailVerificationPage = $this->getEmailVerificationConfig()['page'] ?? null) {
+                    Route::get($this->getEmailVerificationConfig()['path'] ?? 'verify-email', [$emailVerificationPage, 'create'])
+                        ->name($namePrefix.'.verification.notice');
+
+                    Route::post('email/verification-notification', [$emailVerificationPage, 'store'])
+                        ->middleware(['auth', 'throttle:6,1'])
+                        ->name($namePrefix.'.verification.send');
+                }
+
+                // OTP routes
+                if ($this->hasOtp() && $otpPage = $this->getOtpPage()) {
+                    Route::get($this->getOtpPath(), [$otpPage, 'create'])
+                        ->name($namePrefix.'.otp.login');
+
+                    Route::post($this->getOtpPath(), [$otpPage, 'store'])
+                        ->name($namePrefix.'.otp.verify');
+
+                    Route::post('otp/resend', [$otpPage, 'resend'])
+                        ->middleware(['throttle:6,1'])
+                        ->name($namePrefix.'.otp.resend');
+                }
+
+                // Magic Links routes
+                if ($this->hasMagicLinks() && $magicLinksPage = $this->getMagicLinksPage()) {
+                    Route::get($this->getMagicLinksPath(), [$magicLinksPage, 'create'])
+                        ->name($namePrefix.'.magic-link.create');
+
+                    Route::post($this->getMagicLinksPath(), [$magicLinksPage, 'store'])
+                        ->name($namePrefix.'.magic-link.store');
+                }
+
+                // Social Login routes
+                if ($this->hasSocialLogin() && class_exists(\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class)) {
+                    Route::get('auth/{provider}/redirect', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'redirect'])
+                        ->name($namePrefix.'.auth.social.redirect');
+
+                    Route::get('auth/{provider}/callback', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'callback'])
+                        ->name($namePrefix.'.auth.social.callback');
+                }
+            });
+
+        // Two-Factor Authentication challenge routes (guest or mid-authentication)
+        Route::middleware([
+            'web',
+            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
+            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
+            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
+            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+        ])
+            ->domain('{tenant}.'.$domain)
+            ->prefix($this->getPath())
+            ->group(function () use ($namePrefix) {
+                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class)) {
+                    Route::get('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'create'])
+                        ->name($namePrefix.'.two-factor.challenge');
+
+                    Route::post('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'store'])
+                        ->name($namePrefix.'.two-factor.challenge.verify');
+
+                    Route::post('two-factor/resend', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'resend'])
+                        ->middleware(['throttle:3,1'])
+                        ->name($namePrefix.'.two-factor.resend');
+                }
+
+                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class)) {
+                    Route::get('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'create'])
+                        ->name($namePrefix.'.two-factor.recovery');
+
+                    Route::post('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'store'])
+                        ->name($namePrefix.'.two-factor.recovery.verify');
+                }
+
+                // Passkey login routes (for 2FA alternative)
+                Route::get('passkey/login-options', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'loginOptions'])
+                    ->name($namePrefix.'.passkey.login-options');
+
+                Route::post('passkey/login', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'login'])
+                    ->name($namePrefix.'.passkey.login');
+
+                // Magic link routes (for 2FA alternative)
+                Route::post('magic-link/send', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'send'])
+                    ->middleware(['throttle:3,1'])
+                    ->name($namePrefix.'.magic-link.send');
+
+                Route::get('magic-link/verify/{token}', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'verify'])
+                    ->middleware(['signed'])
+                    ->name($namePrefix.'.magic-link.verify');
+            });
+
+        // Authenticated routes
+        $authenticatedMiddleware = [
+            'web',
+            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
+            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
+            'panel.auth',
+            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
+            \Laravilt\Panel\Middleware\IdentifyTenant::class,
+            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+        ];
+
+        // Only add RequirePassword middleware if social login is enabled and requires password
+        if ($this->hasSocialLogin() && $this->shouldRequirePasswordForSocialLogin()) {
+            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequirePassword::class;
+        }
+
+        // Only add RequireTwoFactorAuthentication middleware if 2FA is enabled for this panel
+        if ($this->hasTwoFactor()) {
+            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication::class;
+        }
+
+        Route::middleware($authenticatedMiddleware)
+            ->domain('{tenant}.'.$domain)
+            ->prefix($this->getPath())
+            ->group(function () use ($namePrefix) {
+                // Logout route
+                if ($this->hasLogin() && $loginPage = $this->getLoginPage()) {
+                    Route::post('logout', [$loginPage, 'destroy'])
+                        ->name($namePrefix.'.logout');
+                }
+
+                // Quick locale update route
+                Route::post('locale', [\Laravilt\Panel\Http\Controllers\LocaleController::class, 'update'])
+                    ->name($namePrefix.'.locale.update');
+
+                // Email verification verify route
+                if ($this->hasEmailVerification() && $emailVerificationPage = $this->getEmailVerificationConfig()['page'] ?? null) {
+                    Route::get('email/verify/{id}/{hash}', [$emailVerificationPage, 'verify'])
+                        ->middleware(['signed', 'throttle:6,1'])
+                        ->name($namePrefix.'.verification.verify');
+                }
+
+                // Profile/Settings cluster routes for subdomain
+                if ($this->hasProfile() && $profilePage = $this->getProfilePage()) {
+                    $clusterClass = $profilePage::getCluster();
+
+                    if ($clusterClass) {
+                        // Register cluster routes with tenant prefix
+                        $this->registerSubdomainClusterRoutes($clusterClass, $namePrefix);
+
+                        // Add redirect from old profile path to cluster path
+                        $clusterSlug = $clusterClass::getSlug();
+                        $pageSlug = $profilePage::getSlug();
+                        Route::get($this->getProfilePath(), function () use ($clusterSlug, $pageSlug) {
+                            $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
+
+                            return redirect($panel->url("{$clusterSlug}/{$pageSlug}"));
+                        })->name($namePrefix.'.profile');
+                    }
+                }
+            });
+    }
+
+    /**
+     * Register cluster routes for subdomain tenancy.
+     */
+    protected function registerSubdomainClusterRoutes(string $clusterClass, string $namePrefix): void
+    {
+        if (! class_exists($clusterClass)) {
+            return;
+        }
+
+        $clusterSlug = $clusterClass::getSlug();
+
+        // Find all pages that belong to this cluster
+        $clusterPages = collect($this->getPages())
+            ->filter(fn ($pageClass) => method_exists($pageClass, 'getCluster') && $pageClass::getCluster() === $clusterClass)
+            ->values();
+
+        foreach ($clusterPages as $pageClass) {
+            if (! class_exists($pageClass)) {
+                continue;
+            }
+
+            $pageSlug = $pageClass::getSlug();
+            $path = "{$clusterSlug}/{$pageSlug}";
+            $routeName = "{$namePrefix}.{$clusterSlug}.{$pageSlug}";
+
+            $reflection = new \ReflectionClass($pageClass);
+
+            // GET route
+            if ($reflection->hasMethod('index')) {
+                Route::get($path, [$pageClass, 'index'])->name($routeName.'.index');
+            } elseif ($reflection->hasMethod('edit')) {
+                Route::get($path, [$pageClass, 'edit'])->name($routeName.'.edit');
+            } elseif ($reflection->hasMethod('create')) {
+                Route::get($path, [$pageClass, 'create'])->name($routeName);
+            }
+
+            // POST route
+            if ($reflection->hasMethod('store')) {
+                Route::post($path, [$pageClass, 'store'])->name($routeName.'.store');
+            }
+
+            // PATCH route
+            if ($reflection->hasMethod('update')) {
+                Route::patch($path, [$pageClass, 'update'])->name($routeName.'.update');
+            }
+
+            // DELETE route
+            if ($reflection->hasMethod('destroy')) {
+                Route::delete($path, [$pageClass, 'destroy'])->name($routeName.'.destroy');
             }
         }
     }

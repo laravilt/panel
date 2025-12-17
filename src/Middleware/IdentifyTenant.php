@@ -5,6 +5,7 @@ namespace Laravilt\Panel\Middleware;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Laravilt\Panel\Contracts\HasDefaultTenant;
 use Laravilt\Panel\Contracts\HasTenants;
 use Laravilt\Panel\Facades\Laravilt;
@@ -25,6 +26,100 @@ class IdentifyTenant
             return $next($request);
         }
 
+        // In multi-database mode, tenant is resolved by subdomain middleware
+        // On central domain, allow access to auth and registration pages
+        if ($panel->isMultiDatabaseTenancy()) {
+            return $this->handleMultiDatabaseTenancy($request, $next, $panel);
+        }
+
+        // Single-database mode - original logic
+        return $this->handleSingleDatabaseTenancy($request, $next, $panel);
+    }
+
+    /**
+     * Handle multi-database tenancy mode.
+     * On central domain: Allow auth pages and tenant registration.
+     * On tenant subdomain: Tenant is already identified by InitializeTenancyBySubdomain.
+     */
+    protected function handleMultiDatabaseTenancy(Request $request, Closure $next, $panel): Response
+    {
+        $user = $request->user();
+        $host = $request->getHost();
+
+        // Check if we're on a central domain
+        if ($panel->isCentralDomain($host)) {
+            // On central domain, allow access without tenant for:
+            // - Authentication pages (login, register, password reset, etc.)
+            // - Tenant registration page
+            // - API routes
+            $allowedPaths = [
+                $panel->getPath().'/login',
+                $panel->getPath().'/register',
+                $panel->getPath().'/password',
+                $panel->getPath().'/email',
+                $panel->getPath().'/two-factor',
+                $panel->getPath().'/tenant/register',
+                $panel->getPath().'/auth',
+                $panel->getPath().'/magic-link',
+                $panel->getPath().'/otp',
+            ];
+
+            foreach ($allowedPaths as $path) {
+                if ($request->is($path) || $request->is($path.'/*')) {
+                    return $next($request);
+                }
+            }
+
+            // If user is authenticated and on central domain, redirect to tenant registration
+            // if they have no tenants, or redirect to their tenant subdomain
+            if ($user && $user instanceof HasTenants) {
+                $tenants = $user->getTenants($panel);
+
+                if ($tenants->isEmpty()) {
+                    // No tenants - redirect to registration (avoid loop)
+                    if (! $request->is($panel->getPath().'/tenant/register*')) {
+                        return redirect('/'.$panel->getPath().'/tenant/register');
+                    }
+                } else {
+                    // Has tenants - get default or first tenant and redirect to subdomain
+                    $tenant = $user instanceof HasDefaultTenant
+                        ? $user->getDefaultTenant($panel) ?? $tenants->first()
+                        : $tenants->first();
+
+                    if ($tenant) {
+                        $redirectUrl = $panel->getTenantUrl($tenant);
+                        // Use Inertia::location() for cross-domain redirect to avoid CORS issues
+                        if ($request->header('X-Inertia')) {
+                            return Inertia::location($redirectUrl);
+                        }
+
+                        return redirect($redirectUrl);
+                    }
+                }
+            }
+
+            // Allow unauthenticated access to central domain (will be caught by auth middleware)
+            return $next($request);
+        }
+
+        // On tenant subdomain - tenant should already be set by InitializeTenancyBySubdomain
+        $tenant = Laravilt::getTenant();
+
+        if ($tenant && $user && $user instanceof HasTenants) {
+            // Verify user can access this tenant
+            if (! $user->canAccessTenant($tenant)) {
+                abort(403, 'You do not have access to this tenant.');
+            }
+        }
+
+        return $next($request);
+    }
+
+    /**
+     * Handle single-database tenancy mode (original logic).
+     */
+    protected function handleSingleDatabaseTenancy(Request $request, Closure $next, $panel): Response
+    {
         $user = $request->user();
 
         // If no user is authenticated, skip tenant identification
@@ -131,7 +226,7 @@ class IdentifyTenant
     }
 
     /**
-     * Resolve the tenant from route parameter or session.
+     * Resolve the tenant from route parameter, session, or user's current_team_id.
      */
     protected function resolveTenant(Request $request, $panel, $user): ?Model
     {
@@ -159,6 +254,20 @@ class IdentifyTenant
 
             // Clear invalid session tenant
             session()->forget('laravilt.tenant_id');
+        }
+
+        // Try to get from user's current_team_id (if user has this attribute)
+        if (property_exists($user, 'current_team_id') || isset($user->current_team_id)) {
+            $currentTeamId = $user->current_team_id;
+
+            if ($currentTeamId) {
+                $tenant = $tenantModel::find($currentTeamId);
+
+                // Verify the user still has access to this tenant
+                if ($tenant && $user->canAccessTenant($tenant)) {
+                    return $tenant;
+                }
+            }
         }
 
         return null;

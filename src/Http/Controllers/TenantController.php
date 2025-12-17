@@ -48,8 +48,29 @@ class TenantController extends Controller
         // Set the tenant in the manager
         Laravilt::setTenant($tenant);
 
-        // Redirect to the panel dashboard (tenant is identified via session)
-        return redirect('/'.$panel->getPath());
+        // Get the redirect URL - stay on current page if possible
+        $redirectUrl = $request->input('redirect_to');
+
+        // If no explicit redirect, try to use the referer header
+        if (! $redirectUrl) {
+            $referer = $request->header('Referer');
+            if ($referer) {
+                $refererPath = parse_url($referer, PHP_URL_PATH);
+                $panelPath = '/'.$panel->getPath();
+
+                // Only use referer if it's within the same panel
+                if ($refererPath && str_starts_with($refererPath, $panelPath)) {
+                    $redirectUrl = $refererPath;
+                }
+            }
+        }
+
+        // Default to panel dashboard if no valid redirect URL
+        if (! $redirectUrl) {
+            $redirectUrl = '/'.$panel->getPath();
+        }
+
+        return redirect($redirectUrl);
     }
 
     /**

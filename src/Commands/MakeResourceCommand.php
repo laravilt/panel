@@ -1910,6 +1910,7 @@ PHP;
 
             case 'TextInput':
                 $extra = '';
+                $isNumeric = false;
                 if ($modifier === 'email') {
                     $extra = "\n{$indent}    ->email()";
                 } elseif ($modifier === 'url') {
@@ -1920,8 +1921,15 @@ PHP;
                     $extra = "\n{$indent}    ->password()\n{$indent}    ->revealable()";
                 } elseif ($modifier === 'money') {
                     $extra = "\n{$indent}    ->numeric()\n{$indent}    ->prefix('\$')";
+                    $isNumeric = true;
                 } elseif (in_array($type, ['integer', 'bigint', 'smallint', 'float', 'double', 'decimal'])) {
                     $extra = "\n{$indent}    ->numeric()";
+                    $isNumeric = true;
+                }
+
+                // Only add maxLength for non-numeric fields
+                if ($isNumeric) {
+                    return "{$indent}TextInput::make('{$name}'){$extra}{$required},";
                 }
 
                 return "{$indent}TextInput::make('{$name}'){$extra}{$required}\n{$indent}    ->maxLength(255),";

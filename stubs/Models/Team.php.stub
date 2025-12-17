@@ -22,6 +22,8 @@ class Team extends Model implements HasTenantName, HasTenantAvatar
         'slug',
         'avatar',
         'description',
+        'owner_id',
+        'settings',
     ];
 
     /**
@@ -32,6 +34,43 @@ class Team extends Model implements HasTenantName, HasTenantAvatar
     protected $casts = [
         'settings' => 'array',
     ];
+
+    /**
+     * Check if this team should show unassigned records (records with null team_id).
+     * This allows team members to see and assign orphaned records to their team.
+     */
+    public function shouldShowUnassignedRecords(): bool
+    {
+        return $this->settings['show_unassigned_records'] ?? false;
+    }
+
+    /**
+     * Set whether this team should show unassigned records.
+     */
+    public function setShowUnassignedRecords(bool $value): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['show_unassigned_records'] = $value;
+        $this->settings = $settings;
+    }
+
+    /**
+     * Get a specific setting value.
+     */
+    public function getSetting(string $key, mixed $default = null): mixed
+    {
+        return $this->settings[$key] ?? $default;
+    }
+
+    /**
+     * Set a specific setting value.
+     */
+    public function setSetting(string $key, mixed $value): void
+    {
+        $settings = $this->settings ?? [];
+        $settings[$key] = $value;
+        $this->settings = $settings;
+    }
 
     /**
      * Get the users that belong to the team.
@@ -64,7 +103,11 @@ class Team extends Model implements HasTenantName, HasTenantAvatar
      */
     public function getTenantAvatarUrl(): ?string
     {
-        return $this->avatar;
+        if (! $this->avatar) {
+            return null;
+        }
+
+        return asset('storage/'.$this->avatar);
     }
 
     /**

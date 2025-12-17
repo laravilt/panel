@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Concerns;
 
 use Closure;
+use Laravilt\Panel\Tenancy\TenancyMode;
 
 trait HasTenancy
 {
@@ -28,6 +29,30 @@ trait HasTenancy
      * @var array<string, mixed>
      */
     protected array $tenantMenuItems = [];
+
+    /**
+     * Multi-database tenancy mode.
+     */
+    protected TenancyMode $tenancyMode = TenancyMode::Single;
+
+    /**
+     * Domain for subdomain-based tenancy.
+     */
+    protected ?string $tenantDomain = null;
+
+    /**
+     * Models that belong to the tenant database.
+     *
+     * @var array<class-string>
+     */
+    protected array $tenantDbModels = [];
+
+    /**
+     * Models that belong to the central database.
+     *
+     * @var array<class-string>
+     */
+    protected array $centralDbModels = [];
 
     /**
      * Enable tenancy for this panel with a model.
@@ -330,6 +355,12 @@ trait HasTenancy
      */
     public function getTenantUrl(mixed $tenant, string $path = ''): string
     {
+        // In multi-database mode, use subdomain URLs
+        if ($this->isMultiDatabaseTenancy()) {
+            return $this->getMultiDbTenantUrl($tenant, $path);
+        }
+
+        // Single-database mode uses path-based URLs
         $panelPath = trim($this->getPath(), '/');
         $tenantSegment = $this->getTenantUrlSegment($tenant);
         $basePath = $panelPath ? "/{$panelPath}/{$tenantSegment}" : "/{$tenantSegment}";
@@ -339,5 +370,176 @@ trait HasTenancy
         }
 
         return $basePath.$path ?: '/';
+    }
+
+    /**
+     * Enable multi-database tenancy for this panel.
+     *
+     * @param  string  $tenant  The tenant model class
+     * @param  string  $domain  The base domain for subdomains (e.g., 'app.test')
+     */
+    public function multiDatabaseTenancy(string $tenant, string $domain): static
+    {
+        $this->isTenancyEnabled = true;
+        $this->tenantModel = $tenant;
+        $this->tenancyMode = TenancyMode::MultiDatabase;
+        $this->tenantDomain = $domain;
+
+        return $this;
+    }
+
+    /**
+     * Set the tenancy mode explicitly.
+     */
+    public function tenancyMode(TenancyMode|string $mode): static
+    {
+        if (is_string($mode)) {
+            $mode = TenancyMode::from($mode);
+        }
+
+        $this->tenancyMode = $mode;
+
+        return $this;
+    }
+
+    /**
+     * Set the base domain for subdomain-based tenancy.
+     */
+    public function tenantDomain(string $domain): static
+    {
+        $this->tenantDomain = $domain;
+
+        return $this;
+    }
+
+    /**
+     * Configure which models belong to the tenant database.
+     *
+     * @param  array<class-string>  $models
+     */
+    public function tenantModels(array $models): static
+    {
+        $this->tenantDbModels = $models;
+
+        return $this;
+    }
+
+    /**
+     * Configure which models belong to the central database.
+     *
+     * @param  array<class-string>  $models
+     */
+    public function centralModels(array $models): static
+    {
+        $this->centralDbModels = $models;
+
+        return $this;
+    }
+
+    /**
+     * Check if this panel uses multi-database tenancy.
+     */
+    public function isMultiDatabaseTenancy(): bool
+    {
+        return $this->tenancyMode->isMultiDatabase();
+    }
+
+    /**
+     * Check if this panel uses single-database tenancy.
+     */
+    public function isSingleDatabaseTenancy(): bool
+    {
+        return $this->tenancyMode->isSingle();
+    }
+
+    /**
+     * Get the tenancy mode.
+     */
+    public function getTenancyMode(): TenancyMode
+    {
+        return $this->tenancyMode;
+    }
+
+    /**
+     * Get the base domain for subdomain tenancy.
+     */
+    public function getTenantDomain(): ?string
+    {
+        return $this->tenantDomain ?? config('laravilt-tenancy.subdomain.domain');
+    }
+
+    /**
+     * Get the models configured as tenant models.
+     *
+     * @return array<class-string>
+     */
+    public function getTenantModels(): array
+    {
+        return $this->tenantDbModels;
+    }
+
+    /**
+     * Get the models configured as central models.
+     *
+     * @return array<class-string>
+     */
+    public function getCentralModels(): array
+    {
+        return $this->centralDbModels;
+    }
+
+    /**
+     * Get the URL for a tenant in multi-database mode.
+     */
+    protected function getMultiDbTenantUrl(mixed $tenant, string $path = ''): string
+    {
+        $subdomain = $this->getTenantUrlSegment($tenant);
+        $domain = $this->getTenantDomain();
+        $panelPath = trim($this->getPath(), '/');
+
+        $scheme = request()->secure() ? 'https://' : 'http://';
+        $baseUrl = "{$scheme}{$subdomain}.{$domain}";
+
+        $fullPath = $panelPath ? "/{$panelPath}" : '';
+        if ($path) {
+            $fullPath .= '/'.trim($path, '/');
+        }
+
+        return $baseUrl.($fullPath ?: '/');
+    }
+
+    /**
+     * Get the subdomain pattern for route registration.
+     */
+    public function getSubdomainPattern(): string
+    {
+        $domain = $this->getTenantDomain();
+
+        return "{tenant}.{$domain}";
+    }
+
+    /**
+     * Check if a given domain is a reserved subdomain.
+     */
+    public function isReservedSubdomain(string $subdomain): bool
+    {
+        $reserved = config('laravilt-tenancy.subdomain.reserved', [
+            'www', 'api', 'admin', 'app', 'mail', 'ftp', 'webmail', 'cpanel',
+        ]);
+
+        return in_array($subdomain, $reserved);
+    }
+
+    /**
+     * Check if a given domain is a central domain.
+     */
+    public function isCentralDomain(string $domain): bool
+    {
+        $centralDomains = config('laravilt-tenancy.central.domains', [
+            'localhost',
+            '127.0.0.1',
+        ]);
+
+        return in_array($domain, $centralDomains);
     }
 }

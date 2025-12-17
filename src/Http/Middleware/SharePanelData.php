@@ -156,24 +156,26 @@ class SharePanelData
         $user = $request->user();
         $currentTenant = Laravilt::getTenant();
         $slugAttribute = $panel->getTenantSlugAttribute();
+        $isMultiDatabase = $panel->isMultiDatabaseTenancy();
 
         // Get available tenants if user implements HasTenants
         $tenants = [];
         if ($user instanceof HasTenants) {
-            $tenants = $user->getTenants($panel)->map(function ($tenant) use ($currentTenant, $slugAttribute) {
+            $tenants = $user->getTenants($panel)->map(function ($tenant) use ($currentTenant, $slugAttribute, $panel, $isMultiDatabase) {
                 $name = method_exists($tenant, 'getTenantName')
                     ? $tenant->getTenantName()
                     : ($tenant->name ?? $tenant->{$slugAttribute});
 
                 $avatar = method_exists($tenant, 'getTenantAvatarUrl')
                     ? $tenant->getTenantAvatarUrl()
-                    : null;
+                    : ($tenant->avatar ? asset('storage/'.$tenant->avatar) : null);
 
                 return [
                     'id' => $tenant->getKey(),
                     'name' => $name,
                     'slug' => $tenant->{$slugAttribute},
                     'avatar' => $avatar,
+                    'url' => $isMultiDatabase ? $panel->getTenantUrl($tenant) : null,
                     'is_current' => $currentTenant && $currentTenant->getKey() === $tenant->getKey(),
                 ];
             })->values()->toArray();
@@ -188,13 +190,14 @@ class SharePanelData
 
             $currentAvatar = method_exists($currentTenant, 'getTenantAvatarUrl')
                 ? $currentTenant->getTenantAvatarUrl()
-                : null;
+                : ($currentTenant->avatar ? asset('storage/'.$currentTenant->avatar) : null);
 
             $current = [
                 'id' => $currentTenant->getKey(),
                 'name' => $currentName,
                 'slug' => $currentTenant->{$slugAttribute},
                 'avatar' => $currentAvatar,
+                'url' => $isMultiDatabase ? $panel->getTenantUrl($currentTenant) : null,
             ];
         }
 
@@ -206,6 +209,8 @@ class SharePanelData
             'hasTenantMenu' => $panel->hasTenantMenu(),
             'menuItems' => $panel->getTenantMenuItems(),
             'switchUrl' => '/'.$panel->getPath().'/tenant/switch',
+            'isMultiDatabase' => $isMultiDatabase,
+            'baseDomain' => $isMultiDatabase ? $panel->getTenantDomain() : null,
         ];
     }
 

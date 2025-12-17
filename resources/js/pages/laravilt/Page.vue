@@ -378,8 +378,16 @@ const handleFormSubmit = (event: Event) => {
         onError: (errors) => {
             console.error('Validation errors received:', errors);
         },
-        onSuccess: () => {
-            // Action executed successfully
+        onSuccess: (page) => {
+            // Check if action returned a redirect URL (for cross-domain redirects)
+            // Check both snake_case and camelCase for compatibility
+            const actionData = page?.props?.action_updated_data ||
+                               page?.props?.actionUpdatedData ||
+                               (window as any).__laravilt_action_data;
+            if (actionData?.redirect) {
+                window.location.href = actionData.redirect;
+                return;
+            }
         },
     });
 };

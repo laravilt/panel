@@ -102,7 +102,8 @@ abstract class ListRecords extends Page
     {
         $resource = static::getResource();
 
-        return $resource::getModel()::query();
+        // Use getEloquentQuery which applies tenant scoping
+        return $resource::getEloquentQuery();
     }
 
     /**

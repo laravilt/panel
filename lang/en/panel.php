@@ -32,6 +32,7 @@ return [
         'previous' => 'Previous',
         'submit' => 'Submit',
         'logout' => 'Logout',
+        'optional' => 'optional',
     ],
 
     /*
@@ -356,6 +357,21 @@ return [
         'team_slug_placeholder' => 'my-team',
         'team_slug_help' => 'Leave empty to auto-generate from the team name.',
         'tenant_created' => 'Team created successfully!',
+        'team_created' => 'Team created successfully!',
+
+        // Multi-database subdomain tenancy
+        'subdomain' => 'Subdomain',
+        'subdomain_placeholder' => 'your-team',
+        'subdomain_helper' => 'Your team will be accessible at subdomain.:domain',
+        'subdomain_invalid' => 'Subdomain must contain only lowercase letters, numbers, and hyphens.',
+        'subdomain_reserved' => 'This subdomain is reserved and cannot be used.',
+        'subdomain_taken' => 'This subdomain is already in use.',
+        'team_description' => 'Description',
+        'team_description_placeholder' => 'Describe your team or organization...',
+        'what_happens_next' => 'What happens next?',
+        'provision_database' => 'A dedicated database will be created for your team',
+        'provision_subdomain' => 'Your team will be accessible at your chosen subdomain',
+        'provision_redirect' => 'You will be redirected to your new workspace',
 
         // Team Settings Page
         'settings' => [
@@ -404,6 +420,10 @@ return [
             'avatar_hint' => 'JPG, PNG or GIF. Max 2MB.',
             'team_description' => 'Description',
             'team_description_placeholder' => 'Describe your team...',
+            'team_settings' => 'Team Settings',
+            'team_settings_description' => 'Configure team-specific settings and preferences.',
+            'show_unassigned_records' => 'Show Unassigned Records',
+            'show_unassigned_records_description' => 'When enabled, team members can view records that haven\'t been assigned to any team. This allows you to claim and assign orphaned records to your team.',
         ],
 
         // Team Invitation Notifications

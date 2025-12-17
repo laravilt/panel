@@ -77,6 +77,14 @@ const nameForm = useForm({
 const updateTeamName = () => {
     nameForm.patch(`/${props.panel.path}/tenant/settings/name`, {
         preserveScroll: true,
+        onSuccess: (page) => {
+            // Update form with fresh data from server response
+            const team = page.props.team as Props['team'];
+            if (team) {
+                nameForm.defaults({ name: team.name });
+                nameForm.reset();
+            }
+        },
     });
 };
 

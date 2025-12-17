@@ -404,6 +404,10 @@ return [
             'avatar_hint' => 'JPG، PNG أو GIF. الحد الأقصى 2 ميجابايت.',
             'team_description' => 'الوصف',
             'team_description_placeholder' => 'صف فريقك...',
+            'team_settings' => 'إعدادات الفريق',
+            'team_settings_description' => 'تكوين إعدادات وتفضيلات الفريق.',
+            'show_unassigned_records' => 'إظهار السجلات غير المعينة',
+            'show_unassigned_records_description' => 'عند التفعيل، يمكن لأعضاء الفريق عرض السجلات التي لم يتم تعيينها لأي فريق. يتيح لك هذا المطالبة بالسجلات اليتيمة وتعيينها لفريقك.',
         ],
 
         // إشعارات دعوة الفريق

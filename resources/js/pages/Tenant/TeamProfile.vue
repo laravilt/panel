@@ -42,8 +42,12 @@ interface Props {
         description?: string | null;
         avatar?: string | null;
         owner_id: number | null;
+        settings?: {
+            show_unassigned_records?: boolean;
+        };
     };
     isOwner: boolean;
+    hasSettings: boolean;
     permissions: {
         canUpdateTeam: boolean;
         canDeleteTeam?: boolean;
@@ -72,7 +76,11 @@ const profileForm = useForm({
     description: props.team.description || '',
     avatar: null as File | null,
     remove_avatar: false,
+    show_unassigned_records: props.team.settings?.show_unassigned_records ?? false,
 });
+
+// Separate ref for switch to ensure proper binding
+const showUnassignedRecords = ref(props.team.settings?.show_unassigned_records ?? false);
 
 // Avatar preview
 const avatarPreview = ref<string | null>(props.team.avatar || null);
@@ -118,9 +126,28 @@ const removeAvatar = () => {
 };
 
 const updateTeamProfile = () => {
+    // Sync the switch value to the form before submitting
+    profileForm.show_unassigned_records = showUnassignedRecords.value;
+
     profileForm.post(`/${props.panelId}/tenant/settings/profile`, {
         preserveScroll: true,
         forceFormData: true,
+        onSuccess: (page) => {
+            // Update form with fresh data from server response
+            const team = page.props.team as Props['team'];
+            if (team) {
+                profileForm.defaults({
+                    name: team.name,
+                    description: team.description || '',
+                    avatar: null,
+                    remove_avatar: false,
+                    show_unassigned_records: team.settings?.show_unassigned_records ?? false,
+                });
+                profileForm.reset();
+                showUnassignedRecords.value = team.settings?.show_unassigned_records ?? false;
+                avatarPreview.value = team.avatar || null;
+            }
+        },
     });
 };
 
@@ -240,6 +267,35 @@ const layoutProps = {
                             rows="3"
                         />
                         <InputError :message="profileForm.errors.description" />
+                    </div>
+
+                    <!-- Team Settings -->
+                    <div v-if="hasSettings && permissions.canUpdateTeam" class="space-y-4 border-t pt-6">
+                        <div>
+                            <h4 class="text-sm font-medium">{{ trans('panel::panel.tenancy.settings.team_settings') }}</h4>
+                            <p class="text-sm text-muted-foreground">{{ trans('panel::panel.tenancy.settings.team_settings_description') }}</p>
+                        </div>
+
+                        <!-- Show Unassigned Records Toggle -->
+                        <div class="flex items-start justify-between gap-4 rounded-lg border p-4">
+                            <div class="space-y-1 flex-1">
+                                <Label for="show_unassigned_records" class="text-sm font-medium cursor-pointer">
+                                    {{ trans('panel::panel.tenancy.settings.show_unassigned_records') }}
+                                </Label>
+                                <p class="text-xs text-muted-foreground leading-relaxed">
+                                    {{ trans('panel::panel.tenancy.settings.show_unassigned_records_description') }}
+                                </p>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                                <input
+                                    type="checkbox"
+                                    id="show_unassigned_records"
+                                    v-model="showUnassignedRecords"
+                                    class="sr-only peer"
+                                />
+                                <div class="w-11 h-6 bg-input peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-ring peer-focus:ring-offset-2 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-background after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </label>
+                        </div>
                     </div>
 
                     <div v-if="!permissions.canUpdateTeam" class="text-sm text-muted-foreground">

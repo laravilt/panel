@@ -24,7 +24,8 @@
         "laravilt/auth": "^1.0",
         "laravilt/support": "^1.0",
         "laravilt/actions": "^1.0",
-        "laravilt/forms": "^1.0"
+        "laravilt/forms": "^1.0",
+        "stancl/tenancy": "^3.9"
     },
     "require-dev": {
         "larastan/larastan": "^2.9||^3.0",

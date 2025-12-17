@@ -48,6 +48,16 @@ class TenantManager
     }
 
     /**
+     * Check if the current panel uses multi-database tenancy.
+     */
+    public function isMultiDatabaseTenancy(): bool
+    {
+        $panel = PanelFacade::getCurrent();
+
+        return $panel?->isMultiDatabaseTenancy() ?? false;
+    }
+
+    /**
      * Get all tenants for the current user.
      *
      * @return Collection<int, Model>

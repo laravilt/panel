@@ -76,10 +76,19 @@ abstract class CreateRecord extends Page
         // Extract relationship data for many-to-many relationships
         $relationships = $this->extractRelationshipData($data);
 
-        $record = $model::create($data);
+        // Create a new model instance to associate with tenant before saving
+        $record = new $model($data);
+
+        // Associate record with current tenant if applicable (sets team_id for direct relationships)
+        $resource::associateRecordWithTenant($record);
+
+        $record->save();
 
         // Sync many-to-many relationships
         $this->syncRelationships($record, $relationships);
+
+        // Associate record with tenant via many-to-many if applicable (attaches to teams pivot)
+        $resource::associateRecordWithTenantManyToMany($record);
 
         $this->afterCreate();
 

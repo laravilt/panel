@@ -2,13 +2,161 @@
 
 namespace Laravilt\Panel\Http\Controllers;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Laravilt\Panel\Contracts\HasTenants;
+use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
 
 class SelectOptionsController extends Controller
 {
+    /**
+     * Check if the current panel has tenancy enabled.
+     */
+    protected function isTenancyEnabled(): bool
+    {
+        $panel = Panel::getCurrent();
+
+        return $panel && $panel->hasTenancy() && Laravilt::hasTenant();
+    }
+
+    /**
+     * Get the current tenant ID.
+     */
+    protected function getTenantId(): mixed
+    {
+        return Laravilt::getTenantId();
+    }
+
+    /**
+     * Get the tenant model class.
+     */
+    protected function getTenantModel(): ?string
+    {
+        return Laravilt::getTenantModel();
+    }
+
+    /**
+     * Get the current user's accessible tenants (teams).
+     * This is used for team_id/team_ids fields.
+     */
+    protected function getUserTenants(): array
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof HasTenants) {
+            return [];
+        }
+
+        $panel = Panel::getCurrent();
+        if (! $panel) {
+            return [];
+        }
+
+        return $user->getTenants($panel)->pluck('name', 'id')->toArray();
+    }
+
+    /**
+     * Check if a field name represents a tenant/team selection field.
+     */
+    protected function isTenantField(string $fieldName): bool
+    {
+        return in_array($fieldName, ['team_id', 'team_ids', 'tenant_id', 'tenant_ids']);
+    }
+
+    /**
+     * Apply tenant scoping to a query based on the model's tenant relationship.
+     */
+    protected function applyTenantScoping(Builder $query, string $modelClass): Builder
+    {
+        if (! $this->isTenancyEnabled()) {
+            return $query;
+        }
+
+        $tenantId = $this->getTenantId();
+        $tenantModel = $this->getTenantModel();
+
+        if (! $tenantId || ! $tenantModel) {
+            return $query;
+        }
+
+        $model = new $modelClass;
+        $table = $model->getTable();
+
+        // Check if model is the tenant model itself (e.g., Team) - apply user's teams filter
+        if ($modelClass === $tenantModel || is_subclass_of($modelClass, $tenantModel)) {
+            return $this->applyUserTeamsFilter($query);
+        }
+
+        // Check for direct tenant column (e.g., team_id)
+        $tenantColumn = Laravilt::getTenantOwnershipColumn();
+        if ($tenantColumn && \Schema::hasColumn($table, $tenantColumn)) {
+            return $query->where($table.'.'.$tenantColumn, $tenantId);
+        }
+
+        // Check for many-to-many relationship with tenant model (e.g., teams)
+        if ($this->modelHasTenantRelationship($model)) {
+            $tenantTable = (new $tenantModel)->getTable();
+
+            return $query->whereHas('teams', function ($q) use ($tenantId, $tenantTable) {
+                $q->where($tenantTable.'.id', $tenantId);
+            });
+        }
+
+        return $query;
+    }
+
+    /**
+     * Apply filter to only include user's accessible teams.
+     */
+    protected function applyUserTeamsFilter(Builder $query): Builder
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof HasTenants) {
+            return $query->whereRaw('1 = 0'); // Return no results if user has no tenant access
+        }
+
+        $panel = Panel::getCurrent();
+        if (! $panel) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $userTenantIds = $user->getTenants($panel)->pluck('id')->toArray();
+
+        if (empty($userTenantIds)) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('id', $userTenantIds);
+    }
+
+    /**
+     * Check if a model has a many-to-many relationship with the tenant model.
+     */
+    protected function modelHasTenantRelationship(object $model): bool
+    {
+        // Check for common tenant relationship names
+        $relationshipNames = ['teams', 'tenants'];
+
+        foreach ($relationshipNames as $name) {
+            if (method_exists($model, $name)) {
+                try {
+                    $relation = $model->{$name}();
+                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                        return true;
+                    }
+                } catch (\Exception $e) {
+                    continue;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /**
      * Search options for a Select field (both relationship and closure-based).
      *
@@ -66,9 +214,13 @@ class SelectOptionsController extends Controller
         $relation = $modelInstance->{$relationship}();
         $relatedModel = $relation->getRelated();
         $relatedTable = $relatedModel->getTable();
+        $relatedModelClass = get_class($relatedModel);
 
         // Build query
         $query = $relatedModel::query();
+
+        // Apply tenant scoping
+        $query = $this->applyTenantScoping($query, $relatedModelClass);
 
         // Apply search if provided
         if ($search) {
@@ -155,9 +307,13 @@ class SelectOptionsController extends Controller
 
         $relation = $modelInstance->{$relationship}();
         $relatedModel = $relation->getRelated();
+        $relatedModelClass = get_class($relatedModel);
 
         // Build query
         $query = $relatedModel::query();
+
+        // Apply tenant scoping
+        $query = $this->applyTenantScoping($query, $relatedModelClass);
 
         // If specific IDs are requested, get those
         if (! empty($ids)) {
@@ -374,38 +530,63 @@ class SelectOptionsController extends Controller
     {
         $options = [];
 
-        // Remove _id suffix to get potential model name
-        if (str_ends_with($fieldName, '_id')) {
-            $modelName = str_replace('_id', '', $fieldName);
-            $modelName = str($modelName)->studly()->toString();
-
-            // Try common model namespaces
-            $namespaces = [
-                'App\\Models\\',
-                'App\\',
-            ];
-
-            foreach ($namespaces as $namespace) {
-                $fullClassName = $namespace.$modelName;
-                if (class_exists($fullClassName)) {
-                    // Found the model class, fetch records
-                    $records = $fullClassName::whereIn('id', $ids)->get();
-
-                    foreach ($records as $record) {
-                        // Try common label attributes
-                        $label = $record->name
-                            ?? $record->title
-                            ?? $record->label
-                            ?? $record->email
-                            ?? (string) $record->getKey();
-
-                        $options[] = [
-                            'value' => (string) $record->getKey(),
-                            'label' => (string) $label,
-                        ];
-                    }
-                    break;
+        // Special handling for tenant/team fields - return only user's accessible tenants
+        if ($this->isTenantField($fieldName)) {
+            $userTenants = $this->getUserTenants();
+            foreach ($ids as $id) {
+                $id = (string) $id;
+                if (isset($userTenants[$id]) || isset($userTenants[(int) $id])) {
+                    $options[] = [
+                        'value' => $id,
+                        'label' => (string) ($userTenants[$id] ?? $userTenants[(int) $id]),
+                    ];
                 }
+            }
+
+            return response()->json([
+                'options' => $options,
+            ]);
+        }
+
+        // Remove _id or _ids suffix to get potential model name
+        $modelName = $fieldName;
+        if (str_ends_with($fieldName, '_ids')) {
+            $modelName = str_replace('_ids', '', $fieldName);
+        } elseif (str_ends_with($fieldName, '_id')) {
+            $modelName = str_replace('_id', '', $fieldName);
+        }
+
+        $modelName = str($modelName)->studly()->toString();
+
+        // Try common model namespaces
+        $namespaces = [
+            'App\\Models\\',
+            'App\\',
+        ];
+
+        foreach ($namespaces as $namespace) {
+            $fullClassName = $namespace.$modelName;
+            if (class_exists($fullClassName)) {
+                // Build query with tenant scoping
+                $query = $fullClassName::whereIn('id', $ids);
+                $query = $this->applyTenantScoping($query, $fullClassName);
+
+                $records = $query->get();
+
+                foreach ($records as $record) {
+                    // Try common label attributes
+                    $label = $record->name
+                        ?? $record->title
+                        ?? $record->label
+                        ?? $record->email
+                        ?? (string) $record->getKey();
+
+                    $options[] = [
+                        'value' => (string) $record->getKey(),
+                        'label' => (string) $label,
+                    ];
+                }
+                break;
             }
         }
 
@@ -434,68 +615,106 @@ class SelectOptionsController extends Controller
         $options = [];
         $totalCount = 0;
 
-        // Remove _id suffix to get potential model name
-        if (str_ends_with($fieldName, '_id')) {
+        // Special handling for tenant/team fields - return only user's accessible tenants
+        if ($this->isTenantField($fieldName)) {
+            $userTenants = $this->getUserTenants();
+
+            // Apply search filter
+            if ($search) {
+                $searchLower = strtolower($search);
+                $userTenants = array_filter($userTenants, function ($label) use ($searchLower) {
+                    return str_contains(strtolower((string) $label), $searchLower);
+                });
+            }
+
+            $totalCount = count($userTenants);
+
+            // Apply pagination
+            $paginatedTenants = array_slice($userTenants, $offset, $limit, true);
+
+            foreach ($paginatedTenants as $id => $label) {
+                $options[] = [
+                    'value' => (string) $id,
+                    'label' => (string) $label,
+                ];
+            }
+
+            return response()->json([
+                'options' => $options,
+                'hasMore' => ($offset + $limit) < $totalCount,
+                'total' => $totalCount,
+            ]);
+        }
+
+        // Remove _id or _ids suffix to get potential model name
+        $modelName = $fieldName;
+        if (str_ends_with($fieldName, '_ids')) {
+            $modelName = str_replace('_ids', '', $fieldName);
+        } elseif (str_ends_with($fieldName, '_id')) {
             $modelName = str_replace('_id', '', $fieldName);
-            $modelName = str($modelName)->studly()->toString();
+        }
 
-            // Try common model namespaces
-            $namespaces = [
-                'App\\Models\\',
-                'App\\',
-            ];
+        $modelName = str($modelName)->studly()->toString();
 
-            foreach ($namespaces as $namespace) {
-                $fullClassName = $namespace.$modelName;
-                if (class_exists($fullClassName)) {
-                    // Build query
-                    $query = $fullClassName::query();
+        // Try common model namespaces
+        $namespaces = [
+            'App\\Models\\',
+            'App\\',
+        ];
 
-                    // Apply search if provided
-                    if ($search) {
-                        $model = new $fullClassName;
-                        $table = $model->getTable();
+        foreach ($namespaces as $namespace) {
+            $fullClassName = $namespace.$modelName;
+            if (class_exists($fullClassName)) {
+                // Build query
+                $query = $fullClassName::query();
 
-                        // Try common searchable fields
-                        $searchableFields = ['name', 'title', 'label', 'email'];
-                        $existingFields = [];
+                // Apply tenant scoping
+                $query = $this->applyTenantScoping($query, $fullClassName);
 
-                        foreach ($searchableFields as $field) {
-                            if (\Schema::hasColumn($table, $field)) {
-                                $existingFields[] = $field;
+                // Apply search if provided
+                if ($search) {
+                    $model = new $fullClassName;
+                    $table = $model->getTable();
+
+                    // Try common searchable fields
+                    $searchableFields = ['name', 'title', 'label', 'email'];
+                    $existingFields = [];
+
+                    foreach ($searchableFields as $field) {
+                        if (\Schema::hasColumn($table, $field)) {
+                            $existingFields[] = $field;
+                        }
+                    }
+
+                    if (! empty($existingFields)) {
+                        $query->where(function ($q) use ($existingFields, $search) {
+                            foreach ($existingFields as $field) {
+                                $q->orWhere($field, 'like', '%'.$search.'%');
                             }
-                        }
-
-                        if (! empty($existingFields)) {
-                            $query->where(function ($q) use ($existingFields, $search) {
-                                foreach ($existingFields as $field) {
-                                    $q->orWhere($field, 'like', '%'.$search.'%');
-                                }
-                            });
-                        }
+                        });
                     }
-
-                    // Get total count before pagination
-                    $totalCount = $query->count();
-
-                    // Apply pagination
-                    $records = $query->offset($offset)->limit($limit)->get();
-
-                    foreach ($records as $record) {
-                        // Try common label attributes
-                        $label = $record->name
-                            ?? $record->title
-                            ?? $record->label
-                            ?? $record->email
-                            ?? (string) $record->getKey();
-
-                        $options[] = [
-                            'value' => (string) $record->getKey(),
-                            'label' => (string) $label,
-                        ];
-                    }
-                    break;
                 }
+
+                // Get total count before pagination
+                $totalCount = $query->count();
+
+                // Apply pagination
+                $records = $query->offset($offset)->limit($limit)->get();
+
+                foreach ($records as $record) {
+                    // Try common label attributes
+                    $label = $record->name
+                        ?? $record->title
+                        ?? $record->label
+                        ?? $record->email
+                        ?? (string) $record->getKey();
+
+                    $options[] = [
+                        'value' => (string) $record->getKey(),
+                        'label' => (string) $label,
+                    ];
+                }
+                break;
             }
         }
 

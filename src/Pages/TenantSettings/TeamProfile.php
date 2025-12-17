@@ -6,14 +6,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
-use Laravilt\Forms\Components\FileUpload;
-use Laravilt\Forms\Components\Textarea;
 use Laravilt\Forms\Components\TextInput;
+use Laravilt\Forms\Components\Toggle;
 use Laravilt\Panel\Clusters\TenantSettings;
 use Laravilt\Panel\Enums\PageLayout;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
 use Laravilt\Panel\Pages\Page;
+use Laravilt\Schemas\Components\Section;
 
 class TeamProfile extends Page
 {
@@ -78,7 +78,23 @@ class TeamProfile extends Page
             $textInput->helperText(__('panel::panel.tenancy.settings.only_owner_can_edit'));
         }
 
-        return [$textInput];
+        $schema = [$textInput];
+
+        // Add settings section for team owners
+        if ($isOwner && $this->tenantHasAttribute($tenant, 'settings')) {
+            $showUnassigned = $tenant->settings['show_unassigned_records'] ?? false;
+
+            $schema[] = Section::make(__('panel::panel.tenancy.settings.team_settings'))
+                ->description(__('panel::panel.tenancy.settings.team_settings_description'))
+                ->schema([
+                    Toggle::make('show_unassigned_records')
+                        ->label(__('panel::panel.tenancy.settings.show_unassigned_records'))
+                        ->helperText(__('panel::panel.tenancy.settings.show_unassigned_records_description'))
+                        ->default($showUnassigned),
+                ]);
+        }
+
+        return $schema;
     }
 
     protected function getActions(): array
@@ -123,6 +139,19 @@ class TeamProfile extends Page
             $tenant->description = $data['description'];
         }
 
+        // Update settings if the tenant model has this field
+        if ($this->tenantHasAttribute($tenant, 'settings')) {
+            $settings = $tenant->settings ?? [];
+
+            // Update show_unassigned_records setting
+            // Note: FormData may not include false boolean values, so we check the request directly
+            // and treat missing/empty values as false
+            $showUnassigned = $request->input('show_unassigned_records');
+            $settings['show_unassigned_records'] = filter_var($showUnassigned, FILTER_VALIDATE_BOOLEAN);
+
+            $tenant->settings = $settings;
+        }
+
         // Handle avatar upload
         if ($request->hasFile('avatar')) {
             $avatarPath = $this->uploadAvatar($request->file('avatar'), $tenant);
@@ -142,6 +171,13 @@ class TeamProfile extends Page
         }
 
         $tenant->save();
+
+        // Refresh the tenant instance so Laravilt::getTenant() returns fresh data
+        $tenant->refresh();
+        Laravilt::setTenant($tenant);
+
+        // Clear the tenant cache so the next request gets fresh data
+        $this->clearTenantCache($tenant);
 
         notify(__('panel::panel.tenancy.settings.team_updated'));
 
@@ -173,6 +209,27 @@ class TeamProfile extends Page
     }
 
     /**
+     * Clear the tenant cache after updating.
+     */
+    protected function clearTenantCache($tenant): void
+    {
+        $panel = Panel::getCurrent();
+        $cachePrefix = config('laravilt-tenancy.cache.prefix', 'laravilt_tenant_');
+        $baseDomain = $panel?->getTenantDomain();
+        $slugAttribute = $panel?->getTenantSlugAttribute() ?? 'slug';
+
+        // Clear cache by domain
+        if ($baseDomain) {
+            $fullDomain = "{$tenant->{$slugAttribute}}.{$baseDomain}";
+            \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}domain_{$fullDomain}");
+        }
+
+        // Also clear by slug just in case
+        \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}slug_{$tenant->{$slugAttribute}}");
+        \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}id_{$tenant->getKey()}");
+    }
+
+    /**
      * Handle POST request to update team profile.
      */
     public function store(Request $request)
@@ -182,6 +239,7 @@ class TeamProfile extends Page
             'description' => ['nullable', 'string', 'max:1000'],
             'avatar' => ['nullable', 'image', 'max:2048'],
             'remove_avatar' => ['nullable', 'boolean'],
+            'show_unassigned_records' => ['nullable'],
         ]);
 
         return $this->updateTeamProfile($validated, $request);
@@ -246,6 +304,12 @@ class TeamProfile extends Page
             $avatarUrl = $tenant->getTenantAvatarUrl();
         }
 
+        // Get team settings
+        $settings = [];
+        if ($this->tenantHasAttribute($tenant, 'settings')) {
+            $settings = $tenant->settings ?? [];
+        }
+
         return [
             'team' => [
                 'id' => $tenant->getKey(),
@@ -254,8 +318,10 @@ class TeamProfile extends Page
                 'description' => $this->tenantHasAttribute($tenant, 'description') ? $tenant->description : null,
                 'avatar' => $avatarUrl,
                 'owner_id' => $tenant->owner_id ?? null,
+                'settings' => $settings,
             ],
             'isOwner' => $isOwner,
+            'hasSettings' => $this->tenantHasAttribute($tenant, 'settings'),
             'permissions' => [
                 'canUpdateTeam' => $isOwner,
                 'canDeleteTeam' => $isOwner,

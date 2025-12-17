@@ -157,14 +157,27 @@ abstract class ManageRecords extends ListRecords
             ->model($modelClass)
             ->formSchema($formSchema)
             ->component(static::class) // For reactive fields in modal forms
-            ->action(function (array $data) use ($modelClass, $page) {
+            ->action(function (array $data) use ($modelClass, $page, $resource) {
                 // Apply mutation hook
                 $data = $page->mutateFormDataBeforeCreate($data);
+
+                // Extract many-to-many relationship data before filling
+                $relationships = $page->extractRelationshipData($data, $modelClass);
 
                 // Create the record
                 $record = new $modelClass;
                 $record->fill($data);
+
+                // Associate record with current tenant if applicable
+                $resource::associateRecordWithTenant($record);
+
                 $record->save();
+
+                // Sync many-to-many relationships from form data
+                $page->syncRelationships($record, $relationships);
+
+                // Associate record with tenant via many-to-many if applicable
+                $resource::associateRecordWithTenantManyToMany($record);
 
                 \Laravilt\Notifications\Notification::success()
                     ->title(__('notifications::notifications.success'))
@@ -191,6 +204,52 @@ abstract class ManageRecords extends ListRecords
     public function mutateFormDataBeforeSave(array $data): array
     {
         return $data;
+    }
+
+    /**
+     * Extract many-to-many relationship data from form data.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function extractRelationshipData(array &$data, string $modelClass): array
+    {
+        $modelInstance = new $modelClass;
+        $relationships = [];
+
+        foreach ($data as $key => $value) {
+            // Check if this key corresponds to a relationship method
+            if (method_exists($modelInstance, $key)) {
+                try {
+                    $relation = $modelInstance->{$key}();
+
+                    // Check if it's a BelongsToMany relationship
+                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                        $relationships[$key] = $value;
+                        unset($data[$key]);
+                    }
+                } catch (\Throwable $e) {
+                    // Not a relationship method, skip
+                    continue;
+                }
+            }
+        }
+
+        return $relationships;
+    }
+
+    /**
+     * Sync many-to-many relationships.
+     *
+     * @param  array<string, mixed>  $relationships
+     */
+    protected function syncRelationships(\Illuminate\Database\Eloquent\Model $record, array $relationships): void
+    {
+        foreach ($relationships as $relationName => $relationData) {
+            if ($relationData !== null) {
+                $record->{$relationName}()->sync($relationData);
+            }
+        }
     }
 
     /**
@@ -257,9 +316,15 @@ abstract class ManageRecords extends ListRecords
                     // Apply mutation hook
                     $data = $page->mutateFormDataBeforeSave($data);
 
+                    // Extract many-to-many relationship data before filling
+                    $relationships = $page->extractRelationshipData($data, $modelClass);
+
                     $existingRecord = $modelClass::findOrFail($recordId);
                     $existingRecord->fill($data);
                     $existingRecord->save();
+
+                    // Sync many-to-many relationships from form data
+                    $page->syncRelationships($existingRecord, $relationships);
 
                     \Laravilt\Notifications\Notification::success()
                         ->title(__('notifications::notifications.success'))

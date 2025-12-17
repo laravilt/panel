@@ -2,9 +2,19 @@
 
 namespace Laravilt\Panel;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravilt\Panel\Events\TenantCreated;
+use Laravilt\Panel\Events\TenantDatabaseCreated;
+use Laravilt\Panel\Events\TenantDeleted;
+use Laravilt\Panel\Events\TenantMigrated;
+use Laravilt\Panel\Listeners\CreateTenantDatabaseListener;
+use Laravilt\Panel\Listeners\DeleteTenantDatabaseListener;
+use Laravilt\Panel\Listeners\MigrateTenantDatabaseListener;
+use Laravilt\Panel\Listeners\SeedTenantDatabaseListener;
 use Laravilt\Panel\Middleware\IdentifyPanel;
+use Laravilt\Panel\Tenancy\MultiDatabaseManager;
 
 class PanelServiceProvider extends ServiceProvider
 {
@@ -18,8 +28,19 @@ class PanelServiceProvider extends ServiceProvider
             'laravilt.panel'
         );
 
+        // Merge tenancy config
+        $this->mergeConfigFrom(
+            __DIR__.'/../config/laravilt-tenancy.php',
+            'laravilt-tenancy'
+        );
+
         $this->app->singleton(PanelRegistry::class);
         $this->app->singleton(TenantManager::class);
+
+        // Register MultiDatabaseManager as singleton
+        $this->app->singleton(MultiDatabaseManager::class, function ($app) {
+            return new MultiDatabaseManager($app['db']);
+        });
     }
 
     /**
@@ -35,6 +56,21 @@ class PanelServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/laravilt-panel.php' => config_path('laravilt/panel.php'),
         ], 'laravilt-panel-config');
+
+        // Publish tenancy config
+        $this->publishes([
+            __DIR__.'/../config/laravilt-tenancy.php' => config_path('laravilt-tenancy.php'),
+        ], 'laravilt-tenancy-config');
+
+        // Publish tenancy migrations
+        $this->publishes([
+            __DIR__.'/../database/migrations/create_tenants_table.php.stub' => database_path('migrations/'.date('Y_m_d_His', time()).'_create_tenants_table.php'),
+            __DIR__.'/../database/migrations/create_domains_table.php.stub' => database_path('migrations/'.date('Y_m_d_His', time() + 1).'_create_domains_table.php'),
+            __DIR__.'/../database/migrations/create_tenant_users_table.php.stub' => database_path('migrations/'.date('Y_m_d_His', time() + 2).'_create_tenant_users_table.php'),
+        ], 'laravilt-tenancy-migrations');
+
+        // Register multi-database tenancy event listeners
+        $this->registerTenancyEventListeners();
 
         $this->publishes([
             __DIR__.'/../lang' => lang_path('vendor/laravilt-panel'),
@@ -95,6 +131,7 @@ class PanelServiceProvider extends ServiceProvider
             \Illuminate\Session\Middleware\StartSession::class,
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \Laravilt\Panel\Middleware\IdentifyPanel::class, // Must come BEFORE AuthenticatesRequests
+            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class, // Multi-db tenancy initialization
             \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
             \Illuminate\Routing\Middleware\ThrottleRequests::class,
             \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
@@ -102,6 +139,10 @@ class PanelServiceProvider extends ServiceProvider
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \Illuminate\Auth\Middleware\Authorize::class,
         ];
+
+        // Register middleware alias for multi-database tenancy
+        $router->aliasMiddleware('tenancy.subdomain', Middleware\InitializeTenancyBySubdomain::class);
+        $router->aliasMiddleware('tenancy.central', Middleware\PreventAccessFromCentralDomains::class);
     }
 
     /**
@@ -133,14 +174,31 @@ class PanelServiceProvider extends ServiceProvider
                 // Remove panel.auth from middleware array to ensure correct order
                 $middlewareWithoutAuth = array_filter($middleware, fn ($m) => $m !== 'panel.auth');
 
-                Route::middleware(array_merge(
+                // Build middleware stack
+                // For multi-database panels, InitializeTenancyBySubdomain must come BEFORE
+                // IdentifyTenant and SharePanelData because those may query the database
+                $tenancyMiddleware = $panel->isMultiDatabaseTenancy()
+                    ? [Middleware\InitializeTenancyBySubdomain::class]
+                    : [];
+
+                $routeMiddleware = array_merge(
                     $middlewareWithoutAuth,
                     [IdentifyPanel::class.':'.$panel->getId()],
                     $authMiddleware,
+                    $tenancyMiddleware, // Must come after auth but before tenant identification
                     [Http\Middleware\HandleLocalization::class],
                     [Middleware\IdentifyTenant::class],
                     [Http\Middleware\SharePanelData::class]
-                ))
+                );
+
+                // For multi-database panels, register subdomain-based routes
+                if ($panel->isMultiDatabaseTenancy()) {
+                    // Register subdomain-based routes for multi-database tenancy
+                    $this->registerMultiDbPanelRoutes($panel, $routeMiddleware);
+                }
+
+                // Always register path-based routes (for central access and single-db mode)
+                Route::middleware($routeMiddleware)
                     ->prefix($panel->getPath())
                     ->name($panel->getId().'.')
                     ->group(function () use ($panel) {
@@ -176,6 +234,57 @@ class PanelServiceProvider extends ServiceProvider
             // Register invitation routes (global, signed URLs)
             $this->registerInvitationRoutes();
         });
+    }
+
+    /**
+     * Register subdomain-based routes for multi-database tenancy panels.
+     */
+    protected function registerMultiDbPanelRoutes(Panel $panel, array $middleware): void
+    {
+        $domain = $panel->getTenantDomain();
+
+        if (! $domain) {
+            return;
+        }
+
+        // Register routes with subdomain matching: {tenant}.domain.com
+        // Use 'subdomain' prefix to avoid conflicts with central tenant management routes
+        // e.g., admin.subdomain.settings.profile instead of admin.tenant.settings.profile
+        Route::middleware($middleware)
+            ->domain('{tenant}.'.$domain)
+            ->prefix($panel->getPath())
+            ->name($panel->getId().'.subdomain.')
+            ->group(function () use ($panel) {
+                // Register tenant routes if tenancy is enabled
+                if ($panel->hasTenancy()) {
+                    $this->registerTenantRoutes($panel);
+                }
+
+                // Register Select options search endpoint
+                Route::get('_select/search', [Http\Controllers\SelectOptionsController::class, 'search'])
+                    ->name('select.search');
+                Route::get('_select/options', [Http\Controllers\SelectOptionsController::class, 'getOptions'])
+                    ->name('select.options');
+
+                // Register cluster routes first (for pages that belong to clusters)
+                foreach ($panel->getClusters() as $clusterClass) {
+                    $this->registerCustomClusterRoutes($clusterClass, $panel);
+                }
+
+                // Register auth cluster routes (Settings cluster from laravilt/auth)
+                // These are normally registered in HasAuth but only for central domain
+                $this->registerAuthClusterRoutesForSubdomain($panel);
+
+                // Register page routes (pages without clusters)
+                foreach ($panel->getPages() as $pageClass) {
+                    $this->registerPageRoute($pageClass, $panel);
+                }
+
+                // Register resource routes (without API, those are registered above)
+                foreach ($panel->getResources() as $resourceClass) {
+                    $this->registerResourceRoutes($resourceClass, $panel, false);
+                }
+            });
     }
 
     /**
@@ -1222,6 +1331,161 @@ class PanelServiceProvider extends ServiceProvider
     }
 
     /**
+     * Register auth cluster routes for subdomain (multi-db tenancy).
+     *
+     * The Settings cluster and its pages are registered by HasAuth trait for central domain.
+     * This method registers the same routes for subdomain access in multi-db mode.
+     */
+    protected function registerAuthClusterRoutesForSubdomain(Panel $panel): void
+    {
+        // Find pages that belong to a cluster but are not in $panel->getClusters()
+        // These are typically auth pages from laravilt/auth package
+        $authClusterPages = collect($panel->getPages())
+            ->filter(function ($pageClass) use ($panel) {
+                if (! method_exists($pageClass, 'getCluster')) {
+                    return false;
+                }
+
+                $cluster = $pageClass::getCluster();
+
+                // Only include pages with a cluster that's not already in panel clusters
+                return $cluster !== null && ! in_array($cluster, $panel->getClusters());
+            })
+            ->groupBy(fn ($pageClass) => $pageClass::getCluster());
+
+        // Register routes for each auth cluster
+        foreach ($authClusterPages as $clusterClass => $pages) {
+            if (! class_exists($clusterClass)) {
+                continue;
+            }
+
+            $clusterSlug = $clusterClass::getSlug();
+
+            // Register routes for each page in the cluster
+            foreach ($pages as $pageClass) {
+                $pageSlug = $pageClass::getSlug();
+                $pagePath = "{$clusterSlug}/{$pageSlug}";
+
+                // Determine which methods exist on the page
+                $reflection = new \ReflectionClass($pageClass);
+
+                // GET route (index, create, or edit)
+                if ($reflection->hasMethod('index')) {
+                    Route::get($pagePath, [$pageClass, 'index'])
+                        ->name("{$clusterSlug}.{$pageSlug}.index");
+                } elseif ($reflection->hasMethod('edit')) {
+                    Route::get($pagePath, [$pageClass, 'edit'])
+                        ->name("{$clusterSlug}.{$pageSlug}.edit");
+                } elseif ($reflection->hasMethod('create')) {
+                    Route::get($pagePath, [$pageClass, 'create'])
+                        ->name("{$clusterSlug}.{$pageSlug}");
+                }
+
+                // POST route (store)
+                if ($reflection->hasMethod('store')) {
+                    Route::post($pagePath, [$pageClass, 'store'])
+                        ->name("{$clusterSlug}.{$pageSlug}.store");
+                }
+
+                // DELETE route (destroy)
+                if ($reflection->hasMethod('destroy')) {
+                    Route::delete($pagePath, [$pageClass, 'destroy'])
+                        ->name("{$clusterSlug}.{$pageSlug}.destroy");
+                }
+            }
+
+            // Register cluster index route (redirect to first page)
+            if ($pages->isNotEmpty()) {
+                $firstPage = $pages->first();
+                $firstPageSlug = $firstPage::getSlug();
+                $panelId = $panel->getId();
+
+                Route::get($clusterSlug, function () use ($panelId, $clusterSlug, $firstPageSlug) {
+                    return redirect()->route("{$panelId}.tenant.{$clusterSlug}.{$firstPageSlug}");
+                })->name($clusterSlug);
+            }
+        }
+
+        // Register additional auth-specific routes that need special handling
+        $this->registerAuthSpecialRoutesForSubdomain($panel);
+    }
+
+    /**
+     * Register special auth routes for subdomain (2FA, API tokens, Passkeys, etc.)
+     */
+    protected function registerAuthSpecialRoutesForSubdomain(Panel $panel): void
+    {
+        // Two-Factor Authentication routes
+        if ($panel->hasTwoFactor() && class_exists(\Laravilt\Auth\Pages\Profile\ManageTwoFactor::class)) {
+            $twoFactorPage = \Laravilt\Auth\Pages\Profile\ManageTwoFactor::class;
+            $cluster = $twoFactorPage::getCluster();
+
+            if ($cluster) {
+                $clusterSlug = $cluster::getSlug();
+                $twoFactorSlug = $twoFactorPage::getSlug();
+                $twoFactorPath = "{$clusterSlug}/{$twoFactorSlug}";
+
+                Route::post("{$twoFactorPath}/enable", [$twoFactorPage, 'enable'])
+                    ->name('two-factor.enable');
+
+                Route::post("{$twoFactorPath}/confirm", [$twoFactorPage, 'confirm'])
+                    ->name('two-factor.confirm');
+
+                Route::post("{$twoFactorPath}/cancel", [$twoFactorPage, 'cancel'])
+                    ->name('two-factor.cancel');
+
+                Route::delete("{$twoFactorPath}/disable", [$twoFactorPage, 'disable'])
+                    ->name('two-factor.disable');
+
+                Route::post("{$twoFactorPath}/recovery-codes", [$twoFactorPage, 'regenerateRecoveryCodes'])
+                    ->name('two-factor.recovery-codes');
+            }
+        }
+
+        // API Tokens routes
+        if ($panel->hasApiTokens() && class_exists(\Laravilt\Auth\Pages\Profile\ManageApiTokens::class)) {
+            $apiTokensPage = \Laravilt\Auth\Pages\Profile\ManageApiTokens::class;
+            $cluster = $apiTokensPage::getCluster();
+
+            if ($cluster) {
+                $clusterSlug = $cluster::getSlug();
+                $apiTokensSlug = $apiTokensPage::getSlug();
+                $apiTokensPath = "{$clusterSlug}/{$apiTokensSlug}";
+
+                Route::post("{$apiTokensPath}/store", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'store'])
+                    ->name('api-tokens.store');
+
+                Route::delete("{$apiTokensPath}/{token}", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'destroy'])
+                    ->name('api-tokens.destroy');
+
+                Route::post("{$apiTokensPath}/revoke-all", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'revokeAll'])
+                    ->name('api-tokens.revoke-all');
+            }
+        }
+
+        // Passkeys routes
+        if ($panel->hasPasskeys() && class_exists(\Laravilt\Auth\Pages\Profile\ManagePasskeys::class)) {
+            $passkeysPage = \Laravilt\Auth\Pages\Profile\ManagePasskeys::class;
+            $cluster = $passkeysPage::getCluster();
+
+            if ($cluster) {
+                $clusterSlug = $cluster::getSlug();
+                $passkeysSlug = $passkeysPage::getSlug();
+                $passkeysPath = "{$clusterSlug}/{$passkeysSlug}";
+
+                Route::get("{$passkeysPath}/register-options", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'registerOptions'])
+                    ->name('passkeys.register-options');
+
+                Route::post("{$passkeysPath}/register", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'register'])
+                    ->name('passkeys.register');
+
+                Route::delete("{$passkeysPath}/{credentialId}", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'destroy'])
+                    ->name('passkeys.destroy');
+            }
+        }
+    }
+
+    /**
      * Register Artisan commands.
      */
     protected function registerCommands(): void
@@ -1233,8 +1497,34 @@ class PanelServiceProvider extends ServiceProvider
                 Commands\MakeResourceCommand::class,
                 Commands\MakeRelationManagerCommand::class,
                 Commands\MakeClusterCommand::class,
+                Commands\TenantsMigrateCommand::class,
+                Commands\TenantCreateCommand::class,
+                Commands\TenantDeleteCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Register multi-database tenancy event listeners.
+     */
+    protected function registerTenancyEventListeners(): void
+    {
+        // Only register if in multi-database mode
+        if (config('laravilt-tenancy.mode') !== 'multi') {
+            return;
+        }
+
+        // Create database when tenant is created
+        Event::listen(TenantCreated::class, CreateTenantDatabaseListener::class);
+
+        // Run migrations when database is created
+        Event::listen(TenantDatabaseCreated::class, MigrateTenantDatabaseListener::class);
+
+        // Seed database when migrations complete
+        Event::listen(TenantMigrated::class, SeedTenantDatabaseListener::class);
+
+        // Delete database when tenant is deleted
+        Event::listen(TenantDeleted::class, DeleteTenantDatabaseListener::class);
     }
 
     /**

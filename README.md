@@ -19,6 +19,7 @@ A powerful admin panel framework for Laravel with Vue.js (Inertia.js) frontend. 
 - **Infolists**: Display record details in elegant layouts
 - **Actions**: Customizable actions with modal support
 - **Navigation**: Auto-generated navigation with groups and badges
+- **Multi-Tenancy**: Single-database or multi-database SaaS architecture
 
 ## Installation
 
@@ -152,6 +153,97 @@ $api
     ->update(enabled: true)    // Enable/disable update operation
     ->delete(enabled: true)    // Enable/disable delete operation
     ->useAPITester();          // Enable API Tester interface
+```
+
+## Multi-Tenancy
+
+Laravilt Panel supports two tenancy modes for building SaaS applications:
+
+### Single Database Mode
+
+All tenants share the same database with `tenant_id` scoping. Uses path-based routing.
+
+```php
+use Laravilt\Panel\Panel;
+use App\Models\Team;
+
+Panel::make('admin')
+    ->path('admin')
+    ->tenant(Team::class, 'team', 'slug');
+```
+
+**URL Pattern:** `/admin/{team}/dashboard`
+
+### Multi-Database Mode
+
+Each tenant has their own database with complete data isolation. Uses subdomain-based routing.
+
+```php
+use Laravilt\Panel\Panel;
+use Laravilt\Panel\Models\Tenant;
+
+Panel::make('admin')
+    ->path('admin')
+    ->multiDatabaseTenancy(Tenant::class, 'myapp.com')
+    ->tenantRegistration()  // Allow new tenant signup
+    ->tenantProfile()       // Enable team settings page
+    ->tenantModels([
+        \App\Models\Customer::class,
+        \App\Models\Product::class,
+    ]);
+```
+
+**URL Pattern:** `acme.myapp.com/admin/dashboard`
+
+### Tenant Model
+
+The built-in `Tenant` model provides:
+
+- ULID primary keys
+- Automatic slug and database name generation
+- User membership management (owner, admin, member roles)
+- Settings and data storage
+- Trial period support
+- Domain management
+
+```php
+use Laravilt\Panel\Models\Tenant;
+
+$tenant = Tenant::create([
+    'name' => 'Acme Corp',
+    'owner_id' => $user->id,
+]);
+
+// Auto-generated: id, slug, database name
+
+$tenant->addUser($user, 'admin');
+$tenant->setSetting('feature.enabled', true);
+$tenant->onTrial(); // Check trial status
+```
+
+### Configuration
+
+Publish the tenancy configuration:
+
+```bash
+php artisan vendor:publish --tag=laravilt-tenancy-config
+```
+
+Key configuration options:
+
+```php
+// config/laravilt-tenancy.php
+return [
+    'mode' => env('TENANCY_MODE', 'single'),
+    'subdomain' => [
+        'domain' => env('APP_DOMAIN', 'localhost'),
+        'reserved' => ['www', 'api', 'admin'],
+    ],
+    'tenant' => [
+        'database_prefix' => 'tenant_',
+        'auto_migrate' => true,
+    ],
+];
 ```
 
 ## Commands
