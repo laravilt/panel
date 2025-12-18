@@ -1615,7 +1615,7 @@ class PanelServiceProvider extends ServiceProvider
             // Check if using custom page class or default
             if (is_string($profilePage) && class_exists($profilePage) && $profilePage !== 'default') {
                 // Custom page class - use its routes
-                $this->registerCustomTenantPage($profilePage, 'tenant/settings', 'tenant.settings', $panel);
+                $this->registerCustomTenantPage($profilePage, 'tenant-settings', 'tenant.settings', $panel);
             } else {
                 // Default: Use the cluster-based pages
                 $this->registerTenantSettingsCluster($panel);
@@ -1636,30 +1636,30 @@ class PanelServiceProvider extends ServiceProvider
         ]);
 
         // Register cluster index route (redirects to first page)
-        Route::get('tenant/settings', [Clusters\TenantSettings::class, 'create'])
+        Route::get('tenant-settings', [Clusters\TenantSettings::class, 'create'])
             ->name('tenant.settings');
 
         // Team Profile page routes
-        Route::get('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'create'])
+        Route::get('tenant-settings/profile', [Pages\TenantSettings\TeamProfile::class, 'create'])
             ->name('tenant.settings.profile');
 
-        Route::post('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'store'])
+        Route::post('tenant-settings/profile', [Pages\TenantSettings\TeamProfile::class, 'store'])
             ->name('tenant.settings.profile.store');
 
-        Route::delete('tenant/settings/profile', [Pages\TenantSettings\TeamProfile::class, 'destroy'])
+        Route::delete('tenant-settings/profile', [Pages\TenantSettings\TeamProfile::class, 'destroy'])
             ->name('tenant.settings.profile.destroy');
 
         // Team Members page routes
-        Route::get('tenant/settings/members', [Pages\TenantSettings\TeamMembers::class, 'create'])
+        Route::get('tenant-settings/members', [Pages\TenantSettings\TeamMembers::class, 'create'])
             ->name('tenant.settings.members');
 
-        Route::post('tenant/settings/members', [Pages\TenantSettings\TeamMembers::class, 'store'])
+        Route::post('tenant-settings/members', [Pages\TenantSettings\TeamMembers::class, 'store'])
             ->name('tenant.settings.members.store');
 
-        Route::patch('tenant/settings/members/{member}/role', [Pages\TenantSettings\TeamMembers::class, 'updateRole'])
+        Route::patch('tenant-settings/members/{member}/role', [Pages\TenantSettings\TeamMembers::class, 'updateRole'])
             ->name('tenant.settings.members.update-role');
 
-        Route::delete('tenant/settings/members/{member}', [Pages\TenantSettings\TeamMembers::class, 'destroy'])
+        Route::delete('tenant-settings/members/{member}', [Pages\TenantSettings\TeamMembers::class, 'destroy'])
             ->name('tenant.settings.members.destroy');
     }
 

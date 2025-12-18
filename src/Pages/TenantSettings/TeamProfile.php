@@ -327,7 +327,7 @@ class TeamProfile extends Page
                 'canDeleteTeam' => $isOwner,
             ],
             'routes' => [
-                'deleteTeam' => '/'.$panel->getPath().'/tenant/settings/profile',
+                'deleteTeam' => '/'.$panel->getPath().'/tenant-settings/profile',
             ],
         ];
     }

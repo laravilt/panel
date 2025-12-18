@@ -287,9 +287,9 @@ class TeamMembers extends Page
                 'canUpdateMemberRole' => $isOwner,
             ],
             'routes' => [
-                'addMember' => '/'.$panel->getPath().'/tenant/settings/members',
-                'updateRole' => '/'.$panel->getPath().'/tenant/settings/members/{id}/role',
-                'removeMember' => '/'.$panel->getPath().'/tenant/settings/members/{id}',
+                'addMember' => '/'.$panel->getPath().'/tenant-settings/members',
+                'updateRole' => '/'.$panel->getPath().'/tenant-settings/members/{id}/role',
+                'removeMember' => '/'.$panel->getPath().'/tenant-settings/members/{id}',
             ],
         ];
     }

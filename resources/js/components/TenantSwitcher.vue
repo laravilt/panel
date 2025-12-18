@@ -96,7 +96,7 @@ const switchTenant = async (tenant: Tenant) => {
 };
 
 const goToSettings = () => {
-    router.visit(`/${panelPath.value}/tenant/settings`);
+    router.visit(`/${panelPath.value}/tenant-settings`);
 };
 
 const goToCreateTeam = () => {

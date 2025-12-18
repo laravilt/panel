@@ -129,7 +129,7 @@ const updateTeamProfile = () => {
     // Sync the switch value to the form before submitting
     profileForm.show_unassigned_records = showUnassignedRecords.value;
 
-    profileForm.post(`/${props.panelId}/tenant/settings/profile`, {
+    profileForm.post(`/${props.panelId}/tenant-settings/profile`, {
         preserveScroll: true,
         forceFormData: true,
         onSuccess: (page) => {

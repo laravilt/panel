@@ -75,7 +75,7 @@ const nameForm = useForm({
 });
 
 const updateTeamName = () => {
-    nameForm.patch(`/${props.panel.path}/tenant/settings/name`, {
+    nameForm.patch(`/${props.panel.path}/tenant-settings/name`, {
         preserveScroll: true,
         onSuccess: (page) => {
             // Update form with fresh data from server response
@@ -97,7 +97,7 @@ const addMemberForm = useForm({
 const showAddMemberDialog = ref(false);
 
 const addTeamMember = () => {
-    addMemberForm.post(`/${props.panel.path}/tenant/settings/members`, {
+    addMemberForm.post(`/${props.panel.path}/tenant-settings/members`, {
         preserveScroll: true,
         onSuccess: () => {
             addMemberForm.reset();
@@ -109,7 +109,7 @@ const addTeamMember = () => {
 // Update Member Role
 const updateMemberRole = (memberId: number, role: string) => {
     router.patch(
-        `/${props.panel.path}/tenant/settings/members/${memberId}/role`,
+        `/${props.panel.path}/tenant-settings/members/${memberId}/role`,
         { role },
         { preserveScroll: true }
     );
@@ -127,7 +127,7 @@ const confirmRemoveMember = (member: TeamMember) => {
 const removeMember = () => {
     if (!memberToRemove.value) return;
 
-    router.delete(`/${props.panel.path}/tenant/settings/members/${memberToRemove.value.id}`, {
+    router.delete(`/${props.panel.path}/tenant-settings/members/${memberToRemove.value.id}`, {
         preserveScroll: true,
         onSuccess: () => {
             showRemoveDialog.value = false;
@@ -140,7 +140,7 @@ const removeMember = () => {
 const showDeleteDialog = ref(false);
 
 const deleteTeam = () => {
-    router.delete(`/${props.panel.path}/tenant/settings`, {
+    router.delete(`/${props.panel.path}/tenant-settings`, {
         onSuccess: () => {
             showDeleteDialog.value = false;
         },
