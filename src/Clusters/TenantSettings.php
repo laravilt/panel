@@ -11,7 +11,7 @@ class TenantSettings extends Cluster
 
     protected static ?string $navigationLabel = null;
 
-    protected static ?string $slug = 'tenant/settings';
+    protected static ?string $slug = 'tenant-settings';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -57,6 +57,6 @@ class TenantSettings extends Cluster
         }
 
         // Redirect to team profile page (first page in the cluster)
-        return redirect()->to('/'.$panel->getPath().'/tenant/settings/profile');
+        return redirect()->to('/'.$panel->getPath().'/tenant-settings/profile');
     }
 }
