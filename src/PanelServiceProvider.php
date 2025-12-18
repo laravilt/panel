@@ -418,7 +418,7 @@ class PanelServiceProvider extends ServiceProvider
         })->name('resources.'.$slug.'.store');
 
         // GET /{slug}/{id} - Get single record for view/edit modal
-        Route::get($slug.'/{id}', function () use ($resourceClass, $slug) {
+        Route::get($slug.'/{id}', function () use ($resourceClass) {
             // Use named route parameter to handle subdomain routes where {tenant} is also a parameter
             $id = request()->route('id');
             $pages = $resourceClass::getPages();
