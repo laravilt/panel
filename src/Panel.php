@@ -126,6 +126,11 @@ class Panel
             PanelDiscovery::discover($this);
         }
 
+        // Bridge to plugins
+        if (app()->bound('laravilt.plugins')) {
+            app('laravilt.plugins')->registerWithPanel($this);
+        }
+
         // Ensure RequirePassword middleware is added if social login requires it
         if (method_exists($this, 'ensureRequirePasswordMiddleware')) {
             $this->ensureRequirePasswordMiddleware();
