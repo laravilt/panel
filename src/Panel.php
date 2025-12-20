@@ -126,9 +126,12 @@ class Panel
             PanelDiscovery::discover($this);
         }
 
-        // Bridge to plugins
+        // Bridge to plugins (if plugin manager supports panel registration)
         if (app()->bound('laravilt.plugins')) {
-            app('laravilt.plugins')->registerWithPanel($this);
+            $pluginManager = app('laravilt.plugins');
+            if (method_exists($pluginManager, 'registerWithPanel')) {
+                $pluginManager->registerWithPanel($this);
+            }
         }
 
         // Ensure RequirePassword middleware is added if social login requires it
