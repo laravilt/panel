@@ -56,12 +56,19 @@ trait HasResources
             $resources = collect(File::allFiles($config['directory']))
                 ->filter(fn (SplFileInfo $file) => $file->getExtension() === 'php')
                 ->filter(function (SplFileInfo $file) {
-                    // Exclude files in configuration subdirectories (Pages, Form, Table, Grid, InfoList, Api, Ai, Flutter, RelationManagers)
-                    $excludedDirs = ['Pages', 'Form', 'Table', 'Grid', 'InfoList', 'Api', 'Ai', 'Flutter', 'RelationManagers'];
+                    // Exclude files in configuration subdirectories
+                    $excludedDirs = ['Pages', 'Form', 'Table', 'Grid', 'InfoList', 'Infolist', 'Api', 'Ai', 'Flutter', 'RelationManagers', 'NestedResources'];
                     foreach ($excludedDirs as $dir) {
                         if (str_contains($file->getRelativePath(), $dir)) {
                             return false;
                         }
+                    }
+
+                    // Exclude nested resources (Parent/Resources/Child pattern)
+                    // These are discovered through the parent resource's getNestedResources() method
+                    $relativePath = $file->getRelativePath();
+                    if (preg_match('/^[^\/]+\/Resources\//', $relativePath)) {
+                        return false;
                     }
 
                     return true;

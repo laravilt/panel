@@ -377,9 +377,201 @@ class PanelServiceProvider extends ServiceProvider
         // Register relation manager routes
         $this->registerRelationManagerRoutes($resourceClass, $slug, $modelClass, $panel);
 
+        // Register nested resource routes
+        $this->registerNestedResourceRoutes($resourceClass, $slug, $modelClass, $panel);
+
         // Register API routes if resource has API enabled (only if not already registered separately)
         if ($registerApi && $resourceClass::hasApi()) {
             $this->registerResourceApiRoutes($resourceClass, $panel);
+        }
+    }
+
+    /**
+     * Register routes for nested resources.
+     */
+    protected function registerNestedResourceRoutes(string $resourceClass, string $parentSlug, string $parentModelClass, Panel $panel): void
+    {
+        $nestedResources = $resourceClass::getNestedResources();
+
+        if (empty($nestedResources)) {
+            return;
+        }
+
+        foreach ($nestedResources as $nestedResourceClass) {
+            if (! class_exists($nestedResourceClass)) {
+                continue;
+            }
+
+            // Skip if not a NestedResource
+            if (! is_subclass_of($nestedResourceClass, \Laravilt\Panel\Resources\NestedResource::class)) {
+                continue;
+            }
+
+            $nestedSlug = $nestedResourceClass::getSlug();
+            $nestedModelClass = $nestedResourceClass::getModel();
+            $nestedPages = $nestedResourceClass::getPages();
+
+            // URL prefix: /customers/{customer}/tags
+            $urlPrefix = $parentSlug.'/{'.$parentSlug.'}'.'/'.$nestedSlug;
+
+            // Route name prefix: resources.customer.tag
+            $routeNamePrefix = 'resources.'.$parentSlug.'.'.$nestedSlug;
+
+            // Register each nested resource page
+            foreach ($nestedPages as $pageName => $pageConfig) {
+                $pageClass = $pageConfig['class'];
+                $pagePath = ltrim($pageConfig['path'], '/');
+
+                // Build the full path for the nested resource page
+                $fullPath = $pagePath ? $urlPrefix.'/'.$pagePath : $urlPrefix;
+
+                // Build the route name
+                $routeName = $routeNamePrefix.'.'.$pageName;
+
+                // Register the page route with parent record resolution
+                Route::get($fullPath, function (...$args) use ($pageClass, $nestedResourceClass, $parentSlug, $parentModelClass) {
+                    // Get parent record ID from route
+                    $parentId = request()->route($parentSlug);
+
+                    // Resolve parent record
+                    $parentRecord = $parentModelClass::findOrFail($parentId);
+                    $nestedResourceClass::setParentRecord($parentRecord);
+
+                    // Create and boot the page
+                    $page = app($pageClass);
+                    $page->boot();
+                    $page->mount();
+
+                    // Get page props with parent context
+                    $props = $page->getPageProps();
+                    $props['parentRecord'] = $parentRecord->toArray();
+                    $props['parentResource'] = [
+                        'slug' => $parentSlug,
+                        'label' => $nestedResourceClass::getParentResource()::getLabel(),
+                        'pluralLabel' => $nestedResourceClass::getParentResource()::getPluralLabel(),
+                    ];
+                    $props['breadcrumbs'] = $nestedResourceClass::getBreadcrumbs();
+
+                    return \Inertia\Inertia::render($page->getView(), $props);
+                })->name($routeName);
+            }
+
+            // Register data route for nested resource tables
+            Route::get($urlPrefix.'/data', function () use ($nestedResourceClass, $parentSlug, $parentModelClass) {
+                $parentId = request()->route($parentSlug);
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $pages = $nestedResourceClass::getPages();
+                foreach ($pages as $pageConfig) {
+                    $pageClass = $pageConfig['class'];
+                    if (is_subclass_of($pageClass, \Laravilt\Panel\Pages\ListRecords::class) ||
+                        is_subclass_of($pageClass, \Laravilt\Panel\Pages\ManageRecords::class)) {
+                        $page = app($pageClass);
+
+                        return $page->index(request());
+                    }
+                }
+
+                return response()->json(['error' => 'Page not found'], 404);
+            })->name($routeNamePrefix.'.data');
+
+            // Register CRUD routes for nested resources
+            // POST - Create
+            Route::post($urlPrefix, function () use ($nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
+                $parentId = request()->route($parentSlug);
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $data = request()->all();
+                $record = new $nestedModelClass;
+                $record->fill($data);
+
+                // Associate with parent if there's a belongsTo relationship
+                $parentRelationship = $nestedResourceClass::getParentRelationship();
+                if ($parentRelationship && method_exists($record, $parentRelationship)) {
+                    $record->{$parentRelationship}()->associate($parentRecord);
+                }
+
+                $record->save();
+
+                // If it's a many-to-many, attach to parent
+                $childRelationship = $nestedResourceClass::getChildRelationship();
+                if (method_exists($parentRecord, $childRelationship)) {
+                    $relation = $parentRecord->{$childRelationship}();
+                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                        $relation->attach($record->getKey());
+                    }
+                }
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Record created successfully.',
+                    'record' => $record,
+                ], 201);
+            })->name($routeNamePrefix.'.store');
+
+            // GET - Show single record
+            Route::get($urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $record = $nestedModelClass::findOrFail($id);
+
+                return response()->json([
+                    'success' => true,
+                    'record' => $record,
+                ]);
+            })->name($routeNamePrefix.'.show')->where('id', '[0-9]+');
+
+            // PUT/PATCH - Update
+            Route::match(['put', 'patch'], $urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $record = $nestedModelClass::findOrFail($id);
+                $record->fill(request()->all());
+                $record->save();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Record updated successfully.',
+                    'record' => $record,
+                ]);
+            })->name($routeNamePrefix.'.update')->where('id', '[0-9]+');
+
+            // DELETE - Destroy
+            Route::delete($urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $record = $nestedModelClass::findOrFail($id);
+                $record->delete();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Record deleted successfully.',
+                ]);
+            })->name($routeNamePrefix.'.destroy')->where('id', '[0-9]+');
+
+            // Bulk delete
+            Route::post($urlPrefix.'/bulk-delete', function () use ($nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
+                $parentId = request()->route($parentSlug);
+                $parentRecord = $parentModelClass::findOrFail($parentId);
+                $nestedResourceClass::setParentRecord($parentRecord);
+
+                $ids = request()->input('ids', []);
+                if (empty($ids)) {
+                    return response()->json(['success' => false, 'message' => 'No records selected.'], 422);
+                }
+
+                $nestedModelClass::whereIn('id', $ids)->delete();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => count($ids).' records deleted.',
+                ]);
+            })->name($routeNamePrefix.'.bulk-delete');
         }
     }
 
@@ -1547,9 +1739,11 @@ class PanelServiceProvider extends ServiceProvider
                 Commands\MakeResourceCommand::class,
                 Commands\MakeRelationManagerCommand::class,
                 Commands\MakeClusterCommand::class,
+                Commands\MakeNestedResourceCommand::class,
                 Commands\TenantsMigrateCommand::class,
                 Commands\TenantCreateCommand::class,
                 Commands\TenantDeleteCommand::class,
+                Commands\MigrateFilamentCommand::class,
             ]);
         }
     }

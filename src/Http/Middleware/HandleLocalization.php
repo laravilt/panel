@@ -45,6 +45,7 @@ class HandleLocalization
         'actions::actions',          // Actions package
         'notifications::notifications', // Notifications package
         'widgets::widgets',          // Widgets package
+        'infolists::infolists',      // Infolists package
     ];
 
     /**

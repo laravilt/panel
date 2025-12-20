@@ -12,6 +12,41 @@ abstract class EditRecord extends Page
     protected Model $record;
 
     /**
+     * Mount the page with the record.
+     * This method is for compatibility with Filament-style pages.
+     *
+     * @param  int|string|null  $record  The record ID
+     */
+    public function mount($record = null): void
+    {
+        if ($record !== null) {
+            $this->record = $this->getRecord($record);
+        }
+    }
+
+    /**
+     * Get the record by ID.
+     *
+     * @param  int|string  $record  The record ID
+     */
+    public function getRecord($record): Model
+    {
+        $resource = static::getResource();
+        $modelClass = $resource::getModel();
+
+        return $modelClass::findOrFail($record);
+    }
+
+    /**
+     * Fill the form with record data (for compatibility).
+     */
+    public function fillForm(): void
+    {
+        // This is a no-op in Laravilt since we use Inertia
+        // The form is filled via getSchema() which uses the record data
+    }
+
+    /**
      * Get the page title using the resource's label with "Edit" prefix.
      */
     public static function getTitle(): string

@@ -282,7 +282,18 @@ abstract class ManageRecords extends ListRecords
                 ->modalSubmitActionLabel(null)
                 ->modalCancelActionLabel(__('actions::actions.buttons.close'))
                 ->modalWidth('lg')
-                ->isViewOnly(true);
+                ->isViewOnly(true)
+                ->fillForm(function ($record) {
+                    // Fill infolist with record data for viewing
+                    if (is_object($record) && method_exists($record, 'toArray')) {
+                        return $record->toArray();
+                    }
+                    if (is_array($record)) {
+                        return $record;
+                    }
+
+                    return [];
+                });
         }
 
         if ($this->canEdit()) {
@@ -300,6 +311,17 @@ abstract class ManageRecords extends ListRecords
                 ->modalCancelActionLabel(__('actions::actions.buttons.cancel'))
                 ->modalWidth('lg')
                 ->component(static::class) // For reactive fields in modal forms
+                ->fillForm(function ($record) {
+                    // Fill form with record data for editing
+                    if (is_object($record) && method_exists($record, 'toArray')) {
+                        return $record->toArray();
+                    }
+                    if (is_array($record)) {
+                        return $record;
+                    }
+
+                    return [];
+                })
                 ->action(function ($record, array $data) use ($modelClass, $page) {
                     // Get record ID - handle both object and array formats
                     $recordId = null;

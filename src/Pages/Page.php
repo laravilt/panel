@@ -639,8 +639,11 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
 
     /**
      * Mount the page.
+     * Accepts an optional record parameter for record-based pages (View, Edit).
+     *
+     * @param  int|string|null  $record  The record ID (optional)
      */
-    public function mount(): void
+    public function mount($record = null): void
     {
         //
     }

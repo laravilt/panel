@@ -203,6 +203,20 @@ abstract class Resource
     }
 
     /**
+     * Get nested resources for this resource.
+     * Nested resources are accessed through this parent resource's context.
+     *
+     * Example: CustomerResource has TagResource as a nested resource
+     * URL: /admin/customers/{customer}/tags
+     *
+     * @return array<class-string<NestedResource>>
+     */
+    public static function getNestedResources(): array
+    {
+        return [];
+    }
+
+    /**
      * @return array<class-string>
      */
     public static function getRelations(): array
@@ -489,6 +503,11 @@ abstract class Resource
         $pages = static::getPages();
         $defaultListPage = array_key_exists('list', $pages) ? 'list' : 'index';
 
+        // Page name aliases for backward compatibility
+        $pageAliases = [
+            'list' => 'index',  // 'list' is an alias for 'index'
+        ];
+
         // Support both getUrl($panel) and getUrl('list', $parameters)
         if ($panelOrPage instanceof \Laravilt\Panel\Panel) {
             $panelId = $panelOrPage->getId();
@@ -515,6 +534,11 @@ abstract class Resource
             }
 
             $page = $panelOrPage;
+
+            // Resolve page aliases - if requested page doesn't exist but an alias does
+            if (! array_key_exists($page, $pages) && isset($pageAliases[$page]) && array_key_exists($pageAliases[$page], $pages)) {
+                $page = $pageAliases[$page];
+            }
         }
 
         return route(
