@@ -369,6 +369,17 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
     }
 
     /**
+     * Authorize the page access.
+     * Override this method in child classes to add authorization checks.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    protected function authorizeAccess(): void
+    {
+        // Override in child classes to add authorization checks
+    }
+
+    /**
      * Display the page (GET request handler).
      *
      * This method is called by Laravel routing when a page is accessed.
@@ -380,6 +391,9 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      */
     public function create(\Illuminate\Http\Request $request, ...$parameters)
     {
+        // Authorize access before rendering
+        $this->authorizeAccess();
+
         // Check if child class has a custom __invoke method
         // Use ReflectionMethod to check if __invoke is defined in the child class (not inherited)
         $reflectionClass = new \ReflectionClass($this);

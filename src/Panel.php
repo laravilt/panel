@@ -16,6 +16,7 @@ use Laravilt\Panel\Concerns\HasNavigation;
 use Laravilt\Panel\Concerns\HasNotifications;
 use Laravilt\Panel\Concerns\HasPages;
 use Laravilt\Panel\Concerns\HasPath;
+use Laravilt\Panel\Concerns\HasPlugins;
 use Laravilt\Panel\Concerns\HasResources;
 use Laravilt\Panel\Concerns\HasTenancy;
 use Laravilt\Panel\Concerns\HasTheme;
@@ -36,6 +37,7 @@ class Panel
     use HasNotifications;
     use HasPages;
     use HasPath;
+    use HasPlugins;
     use HasResources;
     use HasTenancy;
     use HasTheme;
@@ -121,6 +123,9 @@ class Panel
      */
     public function register(): void
     {
+        // Register plugins first
+        $this->registerPlugins();
+
         // Auto-discover components if enabled
         if ($this->autoDiscovery) {
             PanelDiscovery::discover($this);
@@ -230,6 +235,9 @@ class Panel
      */
     public function boot(): void
     {
+        // Boot plugins first
+        $this->bootPlugins();
+
         // Register auth pages before booting
         if (method_exists($this, 'getAuthPages')) {
             $authPages = $this->getAuthPages();

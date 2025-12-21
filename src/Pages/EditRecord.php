@@ -106,7 +106,24 @@ abstract class EditRecord extends Page
         // Resolve the model instance from the ID
         $this->record = $modelClass::findOrFail($recordId);
 
+        // Authorize access after record is resolved
+        $this->authorizeAccess();
+
         return $this->render();
+    }
+
+    /**
+     * Authorize access to this page.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    protected function authorizeAccess(): void
+    {
+        $resource = static::getResource();
+
+        if ($resource && ! $resource::canUpdate($this->record)) {
+            abort(403);
+        }
     }
 
     /**
@@ -129,6 +146,49 @@ abstract class EditRecord extends Page
     {
         // Load many-to-many relationship IDs for the form
         $data = $this->loadRelationshipData($data);
+
+        // Load media library data for the form (e.g., avatar URL)
+        $data = $this->loadMediaLibraryData($data);
+
+        return $data;
+    }
+
+    /**
+     * Load media library data into form data for FileUpload fields.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function loadMediaLibraryData(array $data): array
+    {
+        // Check if model uses media library
+        if (! method_exists($this->record, 'getRegisteredMediaCollections')) {
+            return $data;
+        }
+
+        // Get registered media collections from the model
+        try {
+            $collections = $this->record->getRegisteredMediaCollections();
+        } catch (\Throwable $e) {
+            return $data;
+        }
+
+        foreach ($collections as $collection) {
+            $collectionName = $collection->name;
+
+            // Get the media URL(s) for this collection
+            $media = $this->record->getMedia($collectionName);
+
+            if ($media->isNotEmpty()) {
+                // For single file collection, return the URL
+                if ($media->count() === 1) {
+                    $data[$collectionName] = $media->first()->getUrl();
+                } else {
+                    // For multiple files, return array of URLs
+                    $data[$collectionName] = $media->map->getUrl()->toArray();
+                }
+            }
+        }
 
         return $data;
     }
@@ -156,19 +216,175 @@ abstract class EditRecord extends Page
 
     public function save(array $data): Model
     {
+        // Authorize save action
+        $resource = static::getResource();
+        if ($resource && ! $resource::canUpdate($this->record)) {
+            abort(403);
+        }
+
         $data = $this->mutateFormDataBeforeSave($data);
 
         // Extract relationship data for many-to-many relationships
         $relationships = $this->extractRelationshipData($data);
+
+        // Extract media library field data before update
+        $mediaLibraryData = $this->extractMediaLibraryData($data);
 
         $this->record->update($data);
 
         // Sync many-to-many relationships
         $this->syncRelationships($this->record, $relationships);
 
+        // Process media library fields after model is saved
+        $this->processMediaLibraryFields($this->record, $mediaLibraryData);
+
         $this->afterSave();
 
         return $this->record;
+    }
+
+    /**
+     * Extract media library field data from form data.
+     * These fields need to be processed separately after the model is saved.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function extractMediaLibraryData(array &$data): array
+    {
+        $mediaData = [];
+
+        // Check if model uses media library
+        if (! method_exists($this->record, 'getRegisteredMediaCollections')) {
+            return $mediaData;
+        }
+
+        // Get registered media collections from the model
+        $collections = $this->record->getRegisteredMediaCollections();
+
+        foreach ($collections as $collection) {
+            $collectionName = $collection->name;
+
+            // Check if this collection name exists in the form data
+            if (array_key_exists($collectionName, $data)) {
+                $mediaData[$collectionName] = [
+                    'value' => $data[$collectionName],
+                    'collection' => $collectionName,
+                ];
+                unset($data[$collectionName]);
+            }
+        }
+
+        return $mediaData;
+    }
+
+    /**
+     * Process media library fields after the model is saved.
+     *
+     * @param  array<string, mixed>  $mediaData
+     */
+    protected function processMediaLibraryFields(Model $record, array $mediaData): void
+    {
+        // Check if model uses media library
+        if (! method_exists($record, 'addMediaFromDisk') && ! method_exists($record, 'addMedia')) {
+            return;
+        }
+
+        foreach ($mediaData as $fieldName => $fieldConfig) {
+            $value = $fieldConfig['value'];
+            $collection = $fieldConfig['collection'];
+
+            // Skip if no value - clear the collection (user removed the file)
+            if (empty($value)) {
+                if (method_exists($record, 'clearMediaCollection')) {
+                    $record->clearMediaCollection($collection);
+                }
+
+                continue;
+            }
+
+            // Handle single file (string path or URL)
+            if (is_string($value)) {
+                // If value is an existing URL, the media already exists - don't do anything
+                if (str_starts_with($value, 'http://') || str_starts_with($value, 'https://')) {
+                    continue;
+                }
+
+                // Otherwise it's a new file path, add it
+                $this->addMediaFromPath($record, $value, $collection);
+            }
+            // Handle multiple files (array of paths/URLs)
+            elseif (is_array($value)) {
+                // Separate existing URLs from new file paths
+                $existingUrls = [];
+                $newPaths = [];
+
+                foreach ($value as $path) {
+                    if (is_string($path) && ! empty($path)) {
+                        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+                            $existingUrls[] = $path;
+                        } else {
+                            $newPaths[] = $path;
+                        }
+                    }
+                }
+
+                // If there are new paths, we need to handle them
+                if (! empty($newPaths)) {
+                    // Clear existing media for this collection before adding new ones
+                    if (method_exists($record, 'clearMediaCollection')) {
+                        $record->clearMediaCollection($collection);
+                    }
+
+                    foreach ($newPaths as $path) {
+                        $this->addMediaFromPath($record, $path, $collection);
+                    }
+                }
+                // If only existing URLs and no new paths, media is already in place
+            }
+        }
+    }
+
+    /**
+     * Add media to record from a file path.
+     */
+    protected function addMediaFromPath(Model $record, string $path, string $collection): void
+    {
+        // Skip if path is empty or is already a URL (media already exists)
+        if (empty($path) || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return;
+        }
+
+        // The path should be relative to the storage disk
+        $disk = config('filesystems.default', 'public');
+
+        // Try public disk first, then default
+        $disksToCheck = ['public', $disk];
+        $disksToCheck = array_unique($disksToCheck);
+
+        foreach ($disksToCheck as $checkDisk) {
+            $exists = \Illuminate\Support\Facades\Storage::disk($checkDisk)->exists($path);
+
+            if ($exists) {
+                try {
+                    // For single file collection, clear existing first
+                    if (method_exists($record, 'clearMediaCollection')) {
+                        $record->clearMediaCollection($collection);
+                    }
+
+                    // Add media from disk
+                    $record->addMediaFromDisk($path, $checkDisk)
+                        ->toMediaCollection($collection);
+
+                    // Delete the temporary upload after adding to media library
+                    \Illuminate\Support\Facades\Storage::disk($checkDisk)->delete($path);
+
+                    return;
+                } catch (\Throwable $e) {
+                    // Failed to add media, continue to next disk
+                }
+            }
+        }
     }
 
     /**
@@ -181,6 +397,7 @@ abstract class EditRecord extends Page
     protected function loadRelationshipData(array $data): array
     {
         $reflectionClass = new \ReflectionClass($this->record);
+        $modelClass = $this->record::class;
 
         // List of methods to skip (Eloquent methods that should not be called)
         $skipMethods = [
@@ -189,16 +406,41 @@ abstract class EditRecord extends Page
             'getKey', 'getTable', 'getConnection', 'newQuery', 'newQueryWithoutScopes',
             // SoftDeletes trait methods
             'forceDeleteQuietly', 'deleteQuietly', 'restoreQuietly',
+            // Spatie Media Library methods (InteractsWithMedia trait)
+            'media', 'registerMediaCollections', 'getRegisteredMediaCollections',
+            'registerMediaConversions', 'registerAllMediaConversions',
+            'clearMediaCollection', 'clearMediaCollectionExcept',
+            'deletePreservingMedia', 'shouldDeletePreservingMedia',
+            'getMedia', 'getFirstMedia', 'getFirstMediaUrl', 'getFirstMediaPath',
+            'hasMedia', 'loadMedia', 'addMedia', 'addMediaFromUrl', 'addMediaFromDisk',
+            'addMediaFromBase64', 'addMediaFromStream', 'addMediaFromRequest',
+            'copyMedia', 'moveMedia', 'updateMedia', 'syncMedia', 'syncMediaWithIds',
+            'deleteAllMedia', 'deleteMedia',
+            // HasAvatar trait methods
+            'deleteAvatar',
+            // Other destructive/side-effect methods
+            'deleteOtherSessions',
         ];
+
+        // Known relationship methods from traits (e.g., Spatie's HasRoles)
+        $knownRelationshipMethods = ['permissions', 'roles'];
 
         foreach ($reflectionClass->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             $methodName = $method->getName();
+            $declaringClass = $method->getDeclaringClass()->getName();
 
             // Skip magic methods, methods with parameters, and dangerous Eloquent methods
             if (str_starts_with($methodName, '__')
                 || $method->getNumberOfParameters() > 0
-                || in_array($methodName, $skipMethods)
-                || $method->getDeclaringClass()->getName() !== $this->record::class) {
+                || in_array($methodName, $skipMethods)) {
+                continue;
+            }
+
+            // Allow methods declared on model OR known relationship methods from traits
+            $isModelMethod = $declaringClass === $modelClass;
+            $isKnownRelationship = in_array($methodName, $knownRelationshipMethods);
+
+            if (! $isModelMethod && ! $isKnownRelationship) {
                 continue;
             }
 
@@ -233,6 +475,7 @@ abstract class EditRecord extends Page
         $relationships = [];
 
         $reflectionClass = new \ReflectionClass($this->record);
+        $modelClass = $this->record::class;
 
         // List of methods to skip (Eloquent methods that should not be called)
         $skipMethods = [
@@ -241,16 +484,41 @@ abstract class EditRecord extends Page
             'getKey', 'getTable', 'getConnection', 'newQuery', 'newQueryWithoutScopes',
             // SoftDeletes trait methods
             'forceDeleteQuietly', 'deleteQuietly', 'restoreQuietly',
+            // Spatie Media Library methods (InteractsWithMedia trait)
+            'media', 'registerMediaCollections', 'getRegisteredMediaCollections',
+            'registerMediaConversions', 'registerAllMediaConversions',
+            'clearMediaCollection', 'clearMediaCollectionExcept',
+            'deletePreservingMedia', 'shouldDeletePreservingMedia',
+            'getMedia', 'getFirstMedia', 'getFirstMediaUrl', 'getFirstMediaPath',
+            'hasMedia', 'loadMedia', 'addMedia', 'addMediaFromUrl', 'addMediaFromDisk',
+            'addMediaFromBase64', 'addMediaFromStream', 'addMediaFromRequest',
+            'copyMedia', 'moveMedia', 'updateMedia', 'syncMedia', 'syncMediaWithIds',
+            'deleteAllMedia', 'deleteMedia',
+            // HasAvatar trait methods
+            'deleteAvatar',
+            // Other destructive/side-effect methods
+            'deleteOtherSessions',
         ];
+
+        // Known relationship methods from traits (e.g., Spatie's HasRoles)
+        $knownRelationshipMethods = ['permissions', 'roles'];
 
         foreach ($reflectionClass->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
             $methodName = $method->getName();
+            $declaringClass = $method->getDeclaringClass()->getName();
 
             // Skip magic methods, methods with parameters, and dangerous Eloquent methods
             if (str_starts_with($methodName, '__')
                 || $method->getNumberOfParameters() > 0
-                || in_array($methodName, $skipMethods)
-                || $method->getDeclaringClass()->getName() !== $this->record::class) {
+                || in_array($methodName, $skipMethods)) {
+                continue;
+            }
+
+            // Allow methods declared on model OR known relationship methods from traits
+            $isModelMethod = $declaringClass === $modelClass;
+            $isKnownRelationship = in_array($methodName, $knownRelationshipMethods);
+
+            if (! $isModelMethod && ! $isKnownRelationship) {
                 continue;
             }
 
@@ -309,7 +577,7 @@ abstract class EditRecord extends Page
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
 
         $rules = $form->getValidationRules();
         $messages = $form->getValidationMessages();
@@ -347,7 +615,7 @@ abstract class EditRecord extends Page
         $resource = static::getResource();
         $modelClass = $resource::getModel();
 
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
 
         // Fill with record data if available
         if (isset($this->record)) {
@@ -414,12 +682,6 @@ abstract class EditRecord extends Page
         $relationManagers = $resource::getRelations();
         $resourceSlug = $resource::getSlug();
 
-        \Log::info('[EditRecord] getRelationManagers', [
-            'resource' => $resource,
-            'resourceSlug' => $resourceSlug,
-            'relationManagerCount' => count($relationManagers),
-        ]);
-
         return collect($relationManagers)
             ->map(function ($relationManagerClass) use ($resourceSlug) {
                 /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
@@ -428,11 +690,6 @@ abstract class EditRecord extends Page
                 if ($resourceSlug) {
                     $manager->resourceSlug($resourceSlug);
                 }
-
-                \Log::info('[EditRecord] Created manager', [
-                    'managerClass' => $relationManagerClass,
-                    'resourceSlug' => $resourceSlug,
-                ]);
 
                 return $manager->toArray();
             })

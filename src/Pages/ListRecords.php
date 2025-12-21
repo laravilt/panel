@@ -15,6 +15,20 @@ abstract class ListRecords extends Page
     protected string $defaultView = 'table';
 
     /**
+     * Authorize access to this page.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    protected function authorizeAccess(): void
+    {
+        $resource = static::getResource();
+
+        if ($resource && ! $resource::canViewAny()) {
+            abort(403);
+        }
+    }
+
+    /**
      * Get the page title using the resource's plural label.
      */
     public static function getTitle(): string

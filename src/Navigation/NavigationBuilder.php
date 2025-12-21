@@ -150,7 +150,7 @@ class NavigationBuilder
         // Add ungrouped items
         if ($grouped->has('__ungrouped')) {
             foreach ($grouped->get('__ungrouped') as $item) {
-                $navItem = NavigationItem::make($item::getLabel())
+                $navItem = NavigationItem::make($item::getNavigationLabel())
                     ->icon($item::getNavigationIcon())
                     ->url($item::getUrl($panel))
                     ->sort($item::getNavigationSort());
@@ -175,7 +175,7 @@ class NavigationBuilder
             $groupItems = [];
 
             foreach ($items as $item) {
-                $navItem = NavigationItem::make($item::getLabel())
+                $navItem = NavigationItem::make($item::getNavigationLabel())
                     ->icon($item::getNavigationIcon())
                     ->url($item::getUrl($panel))
                     ->sort($item::getNavigationSort());

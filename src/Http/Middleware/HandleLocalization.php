@@ -39,6 +39,7 @@ class HandleLocalization
         'laravilt-support::support', // Support package
         'laravilt-forms::fields',    // Forms package (legacy)
         'forms::forms',              // Forms package (new)
+        'forms::permissions',        // Forms permissions
         'laravilt-schemas::schemas', // Schemas package
         'laravilt-ai::ai',           // AI package
         'tables::tables',            // Tables package

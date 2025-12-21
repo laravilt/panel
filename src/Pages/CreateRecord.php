@@ -15,6 +15,20 @@ abstract class CreateRecord extends Page
     protected array $data = [];
 
     /**
+     * Authorize access to this page.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    protected function authorizeAccess(): void
+    {
+        $resource = static::getResource();
+
+        if ($resource && ! $resource::canCreate()) {
+            abort(403);
+        }
+    }
+
+    /**
      * Get the page title using the resource's label with "Create" prefix.
      */
     public static function getTitle(): string
@@ -69,6 +83,12 @@ abstract class CreateRecord extends Page
     public function createRecord(array $data): Model
     {
         $resource = static::getResource();
+
+        // Authorize create action
+        if ($resource && ! $resource::canCreate()) {
+            abort(403);
+        }
+
         $model = $resource::getModel();
 
         $data = $this->mutateFormDataBeforeCreate($data);
@@ -76,7 +96,13 @@ abstract class CreateRecord extends Page
         // Extract relationship data for many-to-many relationships
         $relationships = $this->extractRelationshipData($data);
 
-        // Create a new model instance to associate with tenant before saving
+        // Create a new model instance to check for media library collections
+        $tempRecord = new $model;
+
+        // Extract media library field data before create
+        $mediaLibraryData = $this->extractMediaLibraryData($data, $tempRecord);
+
+        // Create the actual record
         $record = new $model($data);
 
         // Associate record with current tenant if applicable (sets team_id for direct relationships)
@@ -87,12 +113,126 @@ abstract class CreateRecord extends Page
         // Sync many-to-many relationships
         $this->syncRelationships($record, $relationships);
 
+        // Process media library fields after model is saved
+        $this->processMediaLibraryFields($record, $mediaLibraryData);
+
         // Associate record with tenant via many-to-many if applicable (attaches to teams pivot)
         $resource::associateRecordWithTenantManyToMany($record);
 
         $this->afterCreate();
 
         return $record;
+    }
+
+    /**
+     * Extract media library field data from form data.
+     * These fields need to be processed separately after the model is saved.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function extractMediaLibraryData(array &$data, Model $record): array
+    {
+        $mediaData = [];
+
+        // Check if model uses media library
+        if (! method_exists($record, 'getRegisteredMediaCollections')) {
+            return $mediaData;
+        }
+
+        // Get registered media collections from the model
+        $collections = $record->getRegisteredMediaCollections();
+
+        foreach ($collections as $collection) {
+            $collectionName = $collection->name;
+
+            // Check if this collection name exists in the form data
+            if (array_key_exists($collectionName, $data)) {
+                $mediaData[$collectionName] = [
+                    'value' => $data[$collectionName],
+                    'collection' => $collectionName,
+                ];
+                unset($data[$collectionName]);
+            }
+        }
+
+        return $mediaData;
+    }
+
+    /**
+     * Process media library fields after the model is saved.
+     *
+     * @param  array<string, mixed>  $mediaData
+     */
+    protected function processMediaLibraryFields(Model $record, array $mediaData): void
+    {
+        // Check if model uses media library
+        if (! method_exists($record, 'addMediaFromDisk') && ! method_exists($record, 'addMedia')) {
+            return;
+        }
+
+        foreach ($mediaData as $fieldName => $fieldConfig) {
+            $value = $fieldConfig['value'];
+            $collection = $fieldConfig['collection'];
+
+            // Skip if no value
+            if (empty($value)) {
+                continue;
+            }
+
+            // Handle single file (string path)
+            if (is_string($value)) {
+                $this->addMediaFromPath($record, $value, $collection);
+            }
+            // Handle multiple files (array of paths)
+            elseif (is_array($value)) {
+                foreach ($value as $path) {
+                    if (is_string($path) && ! empty($path)) {
+                        $this->addMediaFromPath($record, $path, $collection);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Add media to record from a file path.
+     */
+    protected function addMediaFromPath(Model $record, string $path, string $collection): void
+    {
+        // Skip if path is empty or is already a URL (media already exists)
+        if (empty($path) || str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return;
+        }
+
+        // The path should be relative to the storage disk
+        $disk = config('filesystems.default', 'public');
+
+        // Try public disk first, then default
+        $disksToCheck = ['public', $disk];
+        $disksToCheck = array_unique($disksToCheck);
+
+        foreach ($disksToCheck as $checkDisk) {
+            if (\Illuminate\Support\Facades\Storage::disk($checkDisk)->exists($path)) {
+                try {
+                    // Add media from disk
+                    $record->addMediaFromDisk($path, $checkDisk)
+                        ->toMediaCollection($collection);
+
+                    // Delete the temporary upload after adding to media library
+                    \Illuminate\Support\Facades\Storage::disk($checkDisk)->delete($path);
+
+                    return;
+                } catch (\Throwable $e) {
+                    \Log::error('Failed to add media from disk', [
+                        'path' => $path,
+                        'disk' => $checkDisk,
+                        'collection' => $collection,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
     }
 
     /**
@@ -153,7 +293,7 @@ abstract class CreateRecord extends Page
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('create'));
 
         $rules = $form->getValidationRules();
         $messages = $form->getValidationMessages();
@@ -191,7 +331,7 @@ abstract class CreateRecord extends Page
         $resource = static::getResource();
         $modelClass = $resource::getModel();
 
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug()));
+        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('create'));
 
         // Get the form schema
         $schema = $form->getSchema();

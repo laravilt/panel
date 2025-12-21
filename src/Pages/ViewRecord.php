@@ -97,7 +97,24 @@ abstract class ViewRecord extends Page
         // Resolve the model instance from the ID
         $this->record = $modelClass::findOrFail($recordId);
 
+        // Authorize access after record is resolved
+        $this->authorizeAccess();
+
         return $this->render();
+    }
+
+    /**
+     * Authorize access to this page.
+     *
+     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     */
+    protected function authorizeAccess(): void
+    {
+        $resource = static::getResource();
+
+        if ($resource && ! $resource::canView($this->record)) {
+            abort(403);
+        }
     }
 
     public function infolist(Schema $schema): Schema
@@ -125,6 +142,8 @@ abstract class ViewRecord extends Page
 
         // Fill with record data if available
         if (isset($this->record)) {
+            // Set the record on schema so entries can access it for closures
+            $infolist->record($this->record);
             $infolist->fill($this->record->toArray());
         }
 

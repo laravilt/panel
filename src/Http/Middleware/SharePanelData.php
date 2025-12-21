@@ -30,10 +30,7 @@ class SharePanelData
                     'brandLogo' => $panel->getBrandLogo(),
                     'navigation' => $panel->getNavigation(),
                     'userMenu' => $panel->getUserMenu(),
-                    'user' => $request->user() ? [
-                        'name' => $request->user()->name,
-                        'email' => $request->user()->email,
-                    ] : null,
+                    'user' => $request->user() ? $this->getUserData($request->user()) : null,
                     'auth' => [
                         'hasProfile' => $panel->hasProfile(),
                         'hasLogin' => $panel->hasLogin(),
@@ -256,6 +253,47 @@ class SharePanelData
         return [
             ['value' => 'en', 'label' => 'English', 'dir' => 'ltr', 'flag' => 'us'],
             ['value' => 'ar', 'label' => 'العربية', 'dir' => 'rtl', 'flag' => 'sa'],
+        ];
+    }
+
+    /**
+     * Get user data for the frontend including avatar.
+     */
+    protected function getUserData($user): array
+    {
+        $avatar = null;
+
+        // Check for avatar using different methods/traits
+        if (method_exists($user, 'getAvatarUrl')) {
+            // HasAvatar trait from laravilt-users package (method call)
+            $avatar = $user->getAvatarUrl();
+        } elseif (method_exists($user, 'getAvatarUrlFromAuth')) {
+            // LaraviltUser trait fallback method
+            $avatar = $user->getAvatarUrlFromAuth();
+        } elseif (isset($user->avatar_url) && $user->avatar_url) {
+            // HasAvatar trait accessor (avatar_url attribute)
+            $avatar = $user->avatar_url;
+        } elseif (method_exists($user, 'getFilamentAvatarUrl')) {
+            // Filament compatibility
+            $avatar = $user->getFilamentAvatarUrl();
+        } elseif (isset($user->avatar) && $user->avatar) {
+            // Direct avatar attribute (string path or URL)
+            $avatar = str_starts_with($user->avatar, 'http')
+                ? $user->avatar
+                : asset('storage/'.$user->avatar);
+        } elseif (method_exists($user, 'getSocialAvatarUrl')) {
+            // LaraviltUser trait - social avatar fallback
+            $avatar = $user->getSocialAvatarUrl();
+        } elseif (isset($user->profile_photo_path) && $user->profile_photo_path) {
+            // Jetstream profile photo
+            $avatar = asset('storage/'.$user->profile_photo_path);
+        }
+
+        return [
+            'id' => $user->getKey(),
+            'name' => $user->name,
+            'email' => $user->email,
+            'avatar' => $avatar,
         ];
     }
 }

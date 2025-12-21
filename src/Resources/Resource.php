@@ -7,6 +7,7 @@ namespace Laravilt\Panel\Resources;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Laravilt\AI\AIAgent;
+use Laravilt\Panel\Concerns\HasResourceAuthorization;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\ApiResource;
@@ -14,6 +15,8 @@ use Laravilt\Tables\Table;
 
 abstract class Resource
 {
+    use HasResourceAuthorization;
+
     /** @var class-string<Model> */
     protected static string $model;
 
@@ -442,10 +445,36 @@ abstract class Resource
 
     public static function getLabel(): string
     {
+        // Check if child class overrides getModelLabel()
+        if (method_exists(static::class, 'getModelLabel')) {
+            $reflection = new \ReflectionMethod(static::class, 'getModelLabel');
+            if ($reflection->getDeclaringClass()->getName() === static::class) {
+                return static::getModelLabel();
+            }
+        }
+
+        return static::$label ?? str(class_basename(static::class))->remove('Resource')->headline()->toString();
+    }
+
+    public static function getModelLabel(): string
+    {
         return static::$label ?? str(class_basename(static::class))->remove('Resource')->headline()->toString();
     }
 
     public static function getPluralLabel(): string
+    {
+        // Check if child class overrides getPluralModelLabel()
+        if (method_exists(static::class, 'getPluralModelLabel')) {
+            $reflection = new \ReflectionMethod(static::class, 'getPluralModelLabel');
+            if ($reflection->getDeclaringClass()->getName() === static::class) {
+                return static::getPluralModelLabel();
+            }
+        }
+
+        return static::$pluralLabel ?? str(static::getLabel())->remove('Resource')->plural()->toString();
+    }
+
+    public static function getPluralModelLabel(): string
     {
         return static::$pluralLabel ?? str(static::getLabel())->remove('Resource')->plural()->toString();
     }
@@ -470,9 +499,14 @@ abstract class Resource
         return static::$navigationSort;
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return static::getLabel();
+    }
+
     public static function isNavigationVisible(): bool
     {
-        return static::$navigationVisible;
+        return static::$navigationVisible && static::canAccess();
     }
 
     public static function getNavigationBadge(): ?string

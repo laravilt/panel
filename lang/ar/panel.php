@@ -32,6 +32,7 @@ return [
         'previous' => 'السابق',
         'submit' => 'إرسال',
         'logout' => 'تسجيل الخروج',
+        'optional' => 'اختياري',
     ],
 
     /*

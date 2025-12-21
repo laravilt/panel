@@ -530,9 +530,13 @@ abstract class ManageRecords extends ListRecords
         try {
             $record = $modelClass::findOrFail($id);
 
+            // Load relationship data for the form
+            $recordData = $record->toArray();
+            $recordData = $this->loadRelationshipDataForRecord($record, $recordData);
+
             return response()->json([
                 'success' => true,
-                'record' => $record,
+                'record' => $recordData,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -540,6 +544,66 @@ abstract class ManageRecords extends ListRecords
                 'message' => $e->getMessage(),
             ], 404);
         }
+    }
+
+    /**
+     * Load relationship data (IDs) for BelongsToMany relationships.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    protected function loadRelationshipDataForRecord(\Illuminate\Database\Eloquent\Model $record, array $data): array
+    {
+        $reflectionClass = new \ReflectionClass($record);
+        $modelClass = $record::class;
+
+        // List of methods to skip (Eloquent methods that should not be called)
+        $skipMethods = [
+            'delete', 'forceDelete', 'restore', 'save', 'update', 'fresh', 'refresh',
+            'push', 'touch', 'replicate', 'toArray', 'toJson', 'jsonSerialize',
+            'getKey', 'getTable', 'getConnection', 'newQuery', 'newQueryWithoutScopes',
+            'forceDeleteQuietly', 'deleteQuietly', 'restoreQuietly',
+        ];
+
+        // Known relationship methods from traits (e.g., Spatie's HasRoles)
+        $knownRelationshipMethods = ['permissions', 'roles'];
+
+        foreach ($reflectionClass->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            $methodName = $method->getName();
+            $declaringClass = $method->getDeclaringClass()->getName();
+
+            if (str_starts_with($methodName, '__')
+                || $method->getNumberOfParameters() > 0
+                || in_array($methodName, $skipMethods)) {
+                continue;
+            }
+
+            // Allow methods declared on model OR known relationship methods from traits
+            $isModelMethod = $declaringClass === $modelClass;
+            $isKnownRelationship = in_array($methodName, $knownRelationshipMethods);
+
+            if (! $isModelMethod && ! $isKnownRelationship) {
+                continue;
+            }
+
+            try {
+                $relation = $record->{$methodName}();
+
+                // Check if it's a BelongsToMany relationship - load IDs
+                if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                    $data[$methodName] = $record->{$methodName}()->pluck($relation->getRelated()->getTable().'.id')->toArray();
+                }
+                // Check if it's a HasMany relationship - load full records (for Repeaters)
+                elseif ($relation instanceof \Illuminate\Database\Eloquent\Relations\HasMany) {
+                    $data[$methodName] = $record->{$methodName}()->get()->toArray();
+                }
+            } catch (\Throwable $e) {
+                // Not a relationship method, skip
+                continue;
+            }
+        }
+
+        return $data;
     }
 
     /**
@@ -562,8 +626,12 @@ abstract class ManageRecords extends ListRecords
             // Get standard page props
             $props = $this->getPageProps();
 
+            // Load relationship data for the form
+            $recordData = $record->toArray();
+            $recordData = $this->loadRelationshipDataForRecord($record, $recordData);
+
             // Add the selected record to props for auto-opening modal
-            $props['selectedRecord'] = $record->toArray();
+            $props['selectedRecord'] = $recordData;
             $props['selectedRecordId'] = $id;
             $props['autoOpenModal'] = 'view'; // or 'edit' based on user preference
 
