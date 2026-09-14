@@ -13,7 +13,7 @@ use Laravilt\Panel\PanelRegistry;
  * @method static bool has(string $id)
  * @method static void setCurrent(string $id)
  *
- * @see \Laravilt\Panel\PanelRegistry
+ * @see PanelRegistry
  */
 class Panel extends Facade
 {

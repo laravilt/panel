@@ -5,6 +5,8 @@ namespace Laravilt\Panel\Middleware;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Laravilt\Panel\Contracts\HasDefaultTenant;
 use Laravilt\Panel\Contracts\HasTenants;
@@ -196,7 +198,7 @@ class IdentifyTenant
 
             // Create a personal team for the user
             $name = $user->name."'s Team";
-            $slug = \Illuminate\Support\Str::slug($user->name).'-'.uniqid();
+            $slug = Str::slug($user->name).'-'.uniqid();
 
             $tenant = new $tenantModel;
             $tenant->name = $name;
@@ -211,7 +213,7 @@ class IdentifyTenant
 
             // Attach user to tenant if there's a relationship method
             $ownershipRelationship = $panel->getTenantOwnershipRelationship();
-            $pluralRelationship = \Illuminate\Support\Str::plural($ownershipRelationship);
+            $pluralRelationship = Str::plural($ownershipRelationship);
 
             // Try to attach via the inverse relationship (e.g., teams on user)
             if (method_exists($user, $pluralRelationship)) {
@@ -227,7 +229,7 @@ class IdentifyTenant
             return $tenant;
         } catch (\Exception $e) {
             // Log error but don't fail - return null to allow graceful fallback
-            \Illuminate\Support\Facades\Log::warning('Failed to auto-create tenant: '.$e->getMessage());
+            Log::warning('Failed to auto-create tenant: '.$e->getMessage());
 
             return null;
         }

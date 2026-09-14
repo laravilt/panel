@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Concerns;
 
 use Laravilt\Panel\Panel;
+use Laravilt\Panel\PanelRegistry;
 
 /**
  * Provides panel access control for user models.
@@ -120,8 +121,8 @@ trait HasPanelAccess
     {
         if ($this->isSuperAdmin()) {
             // Super admin can access all panels
-            if (class_exists(\Laravilt\Panel\PanelRegistry::class)) {
-                $registry = app(\Laravilt\Panel\PanelRegistry::class);
+            if (class_exists(PanelRegistry::class)) {
+                $registry = app(PanelRegistry::class);
 
                 return array_keys($registry->all());
             }
@@ -130,8 +131,8 @@ trait HasPanelAccess
         // Return panels based on user's roles/permissions
         $accessiblePanels = [];
 
-        if (class_exists(\Laravilt\Panel\PanelRegistry::class)) {
-            $registry = app(\Laravilt\Panel\PanelRegistry::class);
+        if (class_exists(PanelRegistry::class)) {
+            $registry = app(PanelRegistry::class);
 
             foreach ($registry->all() as $panelId => $panel) {
                 if ($this->canAccessPanel($panel)) {

@@ -2,6 +2,15 @@
 
 namespace Laravilt\Panel\Tests;
 
+use Laravilt\Actions\ActionsServiceProvider;
+use Laravilt\AI\AIServiceProvider;
+use Laravilt\Forms\FormsServiceProvider;
+use Laravilt\Infolists\InfolistsServiceProvider;
+use Laravilt\Panel\Models\Domain;
+use Laravilt\Panel\Models\Tenant;
+use Laravilt\Panel\PanelServiceProvider;
+use Laravilt\Support\SupportServiceProvider;
+use Laravilt\Tables\TablesServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
@@ -14,13 +23,13 @@ class TestCase extends Orchestra
     protected function getPackageProviders($app): array
     {
         return [
-            \Laravilt\Support\SupportServiceProvider::class,
-            \Laravilt\Forms\FormsServiceProvider::class,
-            \Laravilt\Tables\TablesServiceProvider::class,
-            \Laravilt\Infolists\InfolistsServiceProvider::class,
-            \Laravilt\AI\AIServiceProvider::class,
-            \Laravilt\Actions\ActionsServiceProvider::class,
-            \Laravilt\Panel\PanelServiceProvider::class,
+            SupportServiceProvider::class,
+            FormsServiceProvider::class,
+            TablesServiceProvider::class,
+            InfolistsServiceProvider::class,
+            AIServiceProvider::class,
+            ActionsServiceProvider::class,
+            PanelServiceProvider::class,
         ];
     }
 
@@ -44,8 +53,8 @@ class TestCase extends Orchestra
                 'connection_template' => 'sqlite',
             ],
             'models' => [
-                'tenant' => \Laravilt\Panel\Models\Tenant::class,
-                'domain' => \Laravilt\Panel\Models\Domain::class,
+                'tenant' => Tenant::class,
+                'domain' => Domain::class,
                 'central' => [],
                 'tenant' => [],
             ],

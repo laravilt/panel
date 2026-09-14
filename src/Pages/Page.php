@@ -3,11 +3,17 @@
 namespace Laravilt\Panel\Pages;
 
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Traits\Conditionable;
+use Inertia\Inertia;
 use Laravilt\Actions\Concerns\InteractsWithActions;
 use Laravilt\Actions\Contracts\HasActions;
 use Laravilt\Forms\Concerns\InteractsWithForms;
 use Laravilt\Forms\Contracts\HasForms;
+use Laravilt\Grids\Grid;
+use Laravilt\Panel\Cluster;
 use Laravilt\Panel\Concerns\HasAuth;
 use Laravilt\Panel\Concerns\HasBreadcrumbs;
 use Laravilt\Panel\Concerns\HasMiddleware;
@@ -15,9 +21,14 @@ use Laravilt\Panel\Concerns\HasNavigation;
 use Laravilt\Panel\Concerns\HasResources;
 use Laravilt\Panel\Concerns\HasWidgets;
 use Laravilt\Panel\Contracts\HasPanel as HasPanelContract;
+use Laravilt\Panel\Enums\PageLayout;
 use Laravilt\Panel\Facades\Panel as PanelFacade;
 use Laravilt\Panel\Panel;
 use Laravilt\Support\Concerns\EvaluatesClosures;
+use Laravilt\Tables\Table;
+use Laravilt\Widgets\Stat;
+use Laravilt\Widgets\Widget;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
 {
@@ -260,7 +271,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      */
     public function getLayout(): string
     {
-        return \Laravilt\Panel\Enums\PageLayout::Panel->value;
+        return PageLayout::Panel->value;
     }
 
     /**
@@ -289,7 +300,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
         $clusterPages = collect($panel->getPages())
             ->filter(function ($pageClass) use ($clusterClass) {
                 // Skip clusters themselves
-                if (is_subclass_of($pageClass, \Laravilt\Panel\Cluster::class)) {
+                if (is_subclass_of($pageClass, Cluster::class)) {
                     return false;
                 }
 
@@ -372,7 +383,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      * Authorize the page access.
      * Override this method in child classes to add authorization checks.
      *
-     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     * @throws HttpException
      */
     protected function authorizeAccess(): void
     {
@@ -389,7 +400,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      * If the child class defines an __invoke() method, it will be called instead
      * of the default render() method, allowing for custom page rendering.
      */
-    public function create(\Illuminate\Http\Request $request, ...$parameters)
+    public function create(Request $request, ...$parameters)
     {
         // Authorize access before rendering
         $this->authorizeAccess();
@@ -424,7 +435,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
     {
         foreach ($schema as $item) {
             // Check if this is a Grid or Table
-            if ($item instanceof \Laravilt\Grids\Grid || $item instanceof \Laravilt\Tables\Table) {
+            if ($item instanceof Grid || $item instanceof Table) {
                 $this->configureGridTableActions($item);
             }
         }
@@ -454,7 +465,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
      * This method is called via POST when an action is triggered.
      * It will execute either the action's closure or call a public method on the page.
      */
-    public function executeAction(\Illuminate\Http\Request $request)
+    public function executeAction(Request $request)
     {
         $actionName = $request->input('action');
 
@@ -484,7 +495,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
             $result = $action->execute(null, $data);
 
             // If result is a response, return it
-            if ($result instanceof \Illuminate\Http\Response || $result instanceof \Illuminate\Http\RedirectResponse) {
+            if ($result instanceof Response || $result instanceof RedirectResponse) {
                 return $result;
             }
 
@@ -498,7 +509,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
             $result = $this->{$methodName}($request, $data);
 
             // If result is a response, return it
-            if ($result instanceof \Illuminate\Http\Response || $result instanceof \Illuminate\Http\RedirectResponse) {
+            if ($result instanceof Response || $result instanceof RedirectResponse) {
                 return $result;
             }
 
@@ -588,7 +599,7 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
         // Use custom component if set, otherwise use $view property
         $componentName = $this->component ?? static::$view;
 
-        return \Inertia\Inertia::render($componentName, $props);
+        return Inertia::render($componentName, $props);
     }
 
     /**
@@ -615,9 +626,9 @@ abstract class Page implements HasActions, HasForms, HasPanelContract, Htmlable
             }
 
             // Check if it's a Stat
-            if ($widget instanceof \Laravilt\Widgets\Stat) {
+            if ($widget instanceof Stat) {
                 $statWidgets[] = $widget->toInertiaProps();
-            } elseif ($widget instanceof \Laravilt\Widgets\Widget) {
+            } elseif ($widget instanceof Widget) {
                 $otherWidgets[] = $widget->toInertiaProps();
             } elseif (is_array($widget)) {
                 $otherWidgets[] = $widget;

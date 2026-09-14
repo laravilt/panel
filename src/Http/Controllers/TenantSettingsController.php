@@ -2,6 +2,7 @@
 
 namespace Laravilt\Panel\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
@@ -109,7 +110,7 @@ class TenantSettingsController extends Controller
         ]);
 
         // Find the user by email
-        $userModel = config('auth.providers.users.model', \App\Models\User::class);
+        $userModel = config('auth.providers.users.model', User::class);
         $invitedUser = $userModel::where('email', $validated['email'])->first();
 
         if (! $invitedUser) {

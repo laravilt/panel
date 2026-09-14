@@ -3,6 +3,55 @@
 namespace Laravilt\Panel\Concerns;
 
 use Illuminate\Support\Facades\Route;
+use Laravilt\Auth\Builders\SocialProviderBuilder;
+use Laravilt\Auth\Builders\TwoFactorProviderBuilder;
+use Laravilt\Auth\Clusters\Settings;
+use Laravilt\Auth\Drivers\EmailDriver;
+use Laravilt\Auth\Drivers\SocialProviders\DiscordProvider;
+use Laravilt\Auth\Drivers\SocialProviders\FacebookProvider;
+use Laravilt\Auth\Drivers\SocialProviders\GitHubProvider;
+use Laravilt\Auth\Drivers\SocialProviders\GoogleProvider;
+use Laravilt\Auth\Drivers\SocialProviders\JiraProvider;
+use Laravilt\Auth\Drivers\SocialProviders\LinkedInProvider;
+use Laravilt\Auth\Drivers\SocialProviders\TwitterProvider;
+use Laravilt\Auth\Drivers\TotpDriver;
+use Laravilt\Auth\Http\Controllers\ApiTokenController;
+use Laravilt\Auth\Http\Controllers\Auth\SocialAuthController;
+use Laravilt\Auth\Http\Controllers\MagicLinkController;
+use Laravilt\Auth\Http\Controllers\PasskeyController;
+use Laravilt\Auth\Http\Controllers\TwoFactorAuthController;
+use Laravilt\Auth\Http\Middleware\RequirePassword;
+use Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication;
+use Laravilt\Auth\Pages\Auth\TwoFactorChallenge;
+use Laravilt\Auth\Pages\Auth\TwoFactorRecovery;
+use Laravilt\Auth\Pages\EmailVerification;
+use Laravilt\Auth\Pages\ForgotPassword;
+use Laravilt\Auth\Pages\LocaleTimezone;
+use Laravilt\Auth\Pages\Login;
+use Laravilt\Auth\Pages\MagicLink;
+use Laravilt\Auth\Pages\OTP;
+use Laravilt\Auth\Pages\Profile;
+use Laravilt\Auth\Pages\Profile\ChangePassword;
+use Laravilt\Auth\Pages\Profile\ConnectedAccounts;
+use Laravilt\Auth\Pages\Profile\ManageApiTokens;
+use Laravilt\Auth\Pages\Profile\ManagePasskeys;
+use Laravilt\Auth\Pages\Profile\ManageSessions;
+use Laravilt\Auth\Pages\Profile\ManageTwoFactor;
+use Laravilt\Auth\Pages\Register;
+use Laravilt\Auth\Pages\ResetPassword;
+use Laravilt\Auth\Pages\SetPassword;
+use Laravilt\Auth\Services\SocialProviderManager;
+use Laravilt\Auth\Services\TwoFactorProviderManager;
+use Laravilt\Panel\Http\Controllers\LocaleController;
+use Laravilt\Panel\Http\Middleware\Authenticate;
+use Laravilt\Panel\Http\Middleware\HandleLocalization;
+use Laravilt\Panel\Http\Middleware\SharePanelData;
+use Laravilt\Panel\Middleware\IdentifyPanel;
+use Laravilt\Panel\Middleware\IdentifyTenant;
+use Laravilt\Panel\Middleware\InitializeTenancyBySubdomain;
+use Laravilt\Panel\Navigation\NavigationItem;
+use Laravilt\Panel\Navigation\UserMenu;
+use Laravilt\Panel\PanelRegistry;
 
 trait HasAuth
 {
@@ -46,12 +95,12 @@ trait HasAuth
      */
     protected ?array $socialLoginConfig = null;
 
-    protected ?\Laravilt\Auth\Services\SocialProviderManager $socialProviderManager = null;
+    protected ?SocialProviderManager $socialProviderManager = null;
 
     /**
      * Two-factor provider manager.
      */
-    protected ?\Laravilt\Auth\Services\TwoFactorProviderManager $twoFactorProviderManager = null;
+    protected ?TwoFactorProviderManager $twoFactorProviderManager = null;
 
     /**
      * Two-factor authentication configuration.
@@ -118,7 +167,7 @@ trait HasAuth
     {
         $this->loginConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Login::class,
+            'page' => $page ?? Login::class,
             'path' => $path ?? 'login',
         ];
 
@@ -151,7 +200,7 @@ trait HasAuth
      */
     public function getLoginPage(): ?string
     {
-        return $this->loginConfig['page'] ?? \Laravilt\Auth\Pages\Login::class;
+        return $this->loginConfig['page'] ?? Login::class;
     }
 
     /**
@@ -177,7 +226,7 @@ trait HasAuth
     {
         $this->registerConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Register::class,
+            'page' => $page ?? Register::class,
             'path' => $path ?? 'register',
         ];
 
@@ -207,7 +256,7 @@ trait HasAuth
      */
     public function getRegisterPage(): ?string
     {
-        return $this->registerConfig['page'] ?? \Laravilt\Auth\Pages\Register::class;
+        return $this->registerConfig['page'] ?? Register::class;
     }
 
     /**
@@ -233,7 +282,7 @@ trait HasAuth
     {
         $this->passwordResetConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\ForgotPassword::class,
+            'page' => $page ?? ForgotPassword::class,
             'path' => $path ?? 'forgot-password',
         ];
 
@@ -284,7 +333,7 @@ trait HasAuth
     {
         $this->resetPasswordConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\ResetPassword::class,
+            'page' => $page ?? ResetPassword::class,
             'path' => $path ?? 'reset-password',
         ];
 
@@ -296,7 +345,7 @@ trait HasAuth
      */
     public function getResetPasswordPage(): ?string
     {
-        return $this->resetPasswordConfig['page'] ?? \Laravilt\Auth\Pages\ResetPassword::class;
+        return $this->resetPasswordConfig['page'] ?? ResetPassword::class;
     }
 
     /**
@@ -314,7 +363,7 @@ trait HasAuth
     {
         $this->emailVerificationConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\EmailVerification::class,
+            'page' => $page ?? EmailVerification::class,
             'path' => $path ?? 'verify-email',
         ];
 
@@ -346,7 +395,7 @@ trait HasAuth
     {
         $this->otpConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\OTP::class,
+            'page' => $page ?? OTP::class,
             'path' => $path ?? 'otp',
         ];
 
@@ -394,7 +443,7 @@ trait HasAuth
     {
         $this->profileConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile::class,
+            'page' => $page ?? Profile::class,
             'path' => $path ?? 'profile',
         ];
 
@@ -440,7 +489,7 @@ trait HasAuth
      */
     public function socialLogin(\Closure|array $config): static
     {
-        $builder = new \Laravilt\Auth\Builders\SocialProviderBuilder;
+        $builder = new SocialProviderBuilder;
 
         if ($config instanceof \Closure) {
             // New builder pattern
@@ -449,13 +498,13 @@ trait HasAuth
             // Legacy array pattern - auto-register default providers
             foreach ($config as $providerName) {
                 $providerClass = match ($providerName) {
-                    'google' => \Laravilt\Auth\Drivers\SocialProviders\GoogleProvider::class,
-                    'github' => \Laravilt\Auth\Drivers\SocialProviders\GitHubProvider::class,
-                    'facebook' => \Laravilt\Auth\Drivers\SocialProviders\FacebookProvider::class,
-                    'twitter' => \Laravilt\Auth\Drivers\SocialProviders\TwitterProvider::class,
-                    'linkedin' => \Laravilt\Auth\Drivers\SocialProviders\LinkedInProvider::class,
-                    'discord' => \Laravilt\Auth\Drivers\SocialProviders\DiscordProvider::class,
-                    'jira' => \Laravilt\Auth\Drivers\SocialProviders\JiraProvider::class,
+                    'google' => GoogleProvider::class,
+                    'github' => GitHubProvider::class,
+                    'facebook' => FacebookProvider::class,
+                    'twitter' => TwitterProvider::class,
+                    'linkedin' => LinkedInProvider::class,
+                    'discord' => DiscordProvider::class,
+                    'jira' => JiraProvider::class,
                     default => null,
                 };
 
@@ -465,7 +514,7 @@ trait HasAuth
             }
         }
 
-        $this->socialProviderManager = new \Laravilt\Auth\Services\SocialProviderManager($this->getId());
+        $this->socialProviderManager = new SocialProviderManager($this->getId());
         $this->socialProviderManager->setBuilder($builder);
 
         $this->socialLoginConfig = [
@@ -497,7 +546,7 @@ trait HasAuth
     /**
      * Get social provider manager.
      */
-    public function getSocialProviderManager(): ?\Laravilt\Auth\Services\SocialProviderManager
+    public function getSocialProviderManager(): ?SocialProviderManager
     {
         return $this->socialProviderManager;
     }
@@ -532,16 +581,16 @@ trait HasAuth
     public function twoFactor(?string $page = null, ?string $path = null, ?callable $builder = null): static
     {
         // Initialize the provider manager
-        $this->twoFactorProviderManager = new \Laravilt\Auth\Services\TwoFactorProviderManager($this->getId());
+        $this->twoFactorProviderManager = new TwoFactorProviderManager($this->getId());
 
         // Initialize builder
-        $builderInstance = new \Laravilt\Auth\Builders\TwoFactorProviderBuilder;
+        $builderInstance = new TwoFactorProviderBuilder;
 
         // If no custom builder provided, register default providers
         if ($builder === null) {
             $builderInstance
-                ->provider(\Laravilt\Auth\Drivers\TotpDriver::class)
-                ->provider(\Laravilt\Auth\Drivers\EmailDriver::class);
+                ->provider(TotpDriver::class)
+                ->provider(EmailDriver::class);
         } else {
             // Call the builder callback
             $builder($builderInstance);
@@ -554,7 +603,7 @@ trait HasAuth
 
         $this->twoFactorConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile\ManageTwoFactor::class,
+            'page' => $page ?? ManageTwoFactor::class,
             'path' => $path ?? 'profile/two-factor',
         ];
 
@@ -583,7 +632,7 @@ trait HasAuth
     /**
      * Get two-factor provider manager.
      */
-    public function getTwoFactorProviderManager(): ?\Laravilt\Auth\Services\TwoFactorProviderManager
+    public function getTwoFactorProviderManager(): ?TwoFactorProviderManager
     {
         return $this->twoFactorProviderManager;
     }
@@ -623,7 +672,7 @@ trait HasAuth
     {
         $this->sessionManagementConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile\ManageSessions::class,
+            'page' => $page ?? ManageSessions::class,
             'path' => $path ?? 'profile/sessions',
         ];
 
@@ -671,7 +720,7 @@ trait HasAuth
     {
         $this->apiTokensConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile\ManageApiTokens::class,
+            'page' => $page ?? ManageApiTokens::class,
             'path' => $path ?? 'profile/api-tokens',
         ];
 
@@ -719,7 +768,7 @@ trait HasAuth
     {
         $this->passkeysConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile\ManagePasskeys::class,
+            'page' => $page ?? ManagePasskeys::class,
             'path' => $path ?? 'profile/passkeys',
         ];
 
@@ -767,7 +816,7 @@ trait HasAuth
     {
         $this->magicLinksConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\MagicLink::class,
+            'page' => $page ?? MagicLink::class,
             'path' => $path ?? 'magic-link',
         ];
 
@@ -815,7 +864,7 @@ trait HasAuth
     {
         $this->connectedAccountsConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\Profile\ConnectedAccounts::class,
+            'page' => $page ?? ConnectedAccounts::class,
             'path' => $path ?? 'profile/connected-accounts',
         ];
 
@@ -863,7 +912,7 @@ trait HasAuth
     {
         $this->localeTimezoneConfig = [
             'enabled' => true,
-            'page' => $page ?? \Laravilt\Auth\Pages\LocaleTimezone::class,
+            'page' => $page ?? LocaleTimezone::class,
             'path' => $path ?? 'settings/locale-timezone',
         ];
 
@@ -907,13 +956,13 @@ trait HasAuth
     /**
      * Build auth user menu items.
      */
-    public function buildAuthUserMenu(\Laravilt\Panel\Navigation\UserMenu $menu): void
+    public function buildAuthUserMenu(UserMenu $menu): void
     {
         // Add Settings link if any profile features are enabled
         if ($this->hasProfile() || $this->hasTwoFactor() || $this->hasSessionManagement() ||
             $this->hasApiTokens() || $this->hasPasskeys() || $this->hasConnectedAccounts()) {
 
-            $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make(__('laravilt-panel::panel.user_menu.settings'))
+            $menu->item(NavigationItem::make(__('laravilt-panel::panel.user_menu.settings'))
                 ->translationKey('laravilt-panel::panel.user_menu.settings')
                 ->icon('cog-6-tooth')
                 ->url($this->url('settings/profile')));
@@ -924,7 +973,7 @@ trait HasAuth
             ? route($this->getId().'.logout')
             : (Route::has('logout') ? route('logout') : '/logout');
 
-        $menu->item(\Laravilt\Panel\Navigation\NavigationItem::make(__('laravilt-panel::panel.user_menu.logout'))
+        $menu->item(NavigationItem::make(__('laravilt-panel::panel.user_menu.logout'))
             ->translationKey('laravilt-panel::panel.user_menu.logout')
             ->icon('arrow-right-on-rectangle')
             ->url($logoutUrl)
@@ -939,40 +988,40 @@ trait HasAuth
         $pages = [];
 
         if ($this->hasProfile()) {
-            $pages[] = $this->getProfilePage() ?? \Laravilt\Auth\Pages\Profile::class;
+            $pages[] = $this->getProfilePage() ?? Profile::class;
         }
 
-        if ($this->hasProfile() && class_exists(\Laravilt\Auth\Pages\Profile\ChangePassword::class)) {
-            $pages[] = \Laravilt\Auth\Pages\Profile\ChangePassword::class;
+        if ($this->hasProfile() && class_exists(ChangePassword::class)) {
+            $pages[] = ChangePassword::class;
         }
 
         if ($this->hasTwoFactor()) {
-            $pages[] = $this->getTwoFactorPage() ?? \Laravilt\Auth\Pages\Profile\ManageTwoFactor::class;
+            $pages[] = $this->getTwoFactorPage() ?? ManageTwoFactor::class;
         }
 
         if ($this->hasSessionManagement()) {
-            $pages[] = $this->getSessionManagementPage() ?? \Laravilt\Auth\Pages\Profile\ManageSessions::class;
+            $pages[] = $this->getSessionManagementPage() ?? ManageSessions::class;
         }
 
         if ($this->hasApiTokens()) {
-            $pages[] = $this->getApiTokensPage() ?? \Laravilt\Auth\Pages\Profile\ManageApiTokens::class;
+            $pages[] = $this->getApiTokensPage() ?? ManageApiTokens::class;
         }
 
         if ($this->hasPasskeys()) {
-            $pages[] = $this->getPasskeysPage() ?? \Laravilt\Auth\Pages\Profile\ManagePasskeys::class;
+            $pages[] = $this->getPasskeysPage() ?? ManagePasskeys::class;
         }
 
         if ($this->hasConnectedAccounts()) {
-            $pages[] = $this->getConnectedAccountsPage() ?? \Laravilt\Auth\Pages\Profile\ConnectedAccounts::class;
+            $pages[] = $this->getConnectedAccountsPage() ?? ConnectedAccounts::class;
         }
 
         if ($this->hasLocaleTimezone()) {
-            $pages[] = $this->getLocaleTimezonePage() ?? \Laravilt\Auth\Pages\LocaleTimezone::class;
+            $pages[] = $this->getLocaleTimezonePage() ?? LocaleTimezone::class;
         }
 
         // Add Settings cluster if not already registered
-        if (count($pages) > 0 && class_exists(\Laravilt\Auth\Clusters\Settings::class)) {
-            array_unshift($pages, \Laravilt\Auth\Clusters\Settings::class);
+        if (count($pages) > 0 && class_exists(Settings::class)) {
+            array_unshift($pages, Settings::class);
         }
 
         return $pages;
@@ -1000,9 +1049,9 @@ trait HasAuth
     {
         Route::middleware([
             'web',
-            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
-            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
-            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+            IdentifyPanel::class.':'.$this->getId(),
+            HandleLocalization::class,
+            SharePanelData::class,
         ])
             ->prefix($this->getPath())
             ->group(function () {
@@ -1082,11 +1131,11 @@ trait HasAuth
                 }
 
                 // Social Login routes
-                if ($this->hasSocialLogin() && class_exists(\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class)) {
-                    Route::get('auth/{provider}/redirect', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'redirect'])
+                if ($this->hasSocialLogin() && class_exists(SocialAuthController::class)) {
+                    Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
                         ->name($this->getId().'.auth.social.redirect');
 
-                    Route::get('auth/{provider}/callback', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'callback'])
+                    Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
                         ->name($this->getId().'.auth.social.callback');
                 }
             });
@@ -1095,13 +1144,13 @@ trait HasAuth
         Route::middleware(array_merge(
             ['web'],
             ['auth'.($this->getAuthGuard() ? ':'.$this->getAuthGuard() : '')],
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
-            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class]
+            [IdentifyPanel::class.':'.$this->getId()],
+            [HandleLocalization::class]
         ))
             ->prefix($this->getPath())
             ->group(function () {
-                if (class_exists(\Laravilt\Auth\Pages\SetPassword::class)) {
-                    Route::get('set-password', [\Laravilt\Auth\Pages\SetPassword::class, 'create'])
+                if (class_exists(SetPassword::class)) {
+                    Route::get('set-password', [SetPassword::class, 'create'])
                         ->name($this->getId().'.auth.set-password');
                 }
             });
@@ -1109,45 +1158,45 @@ trait HasAuth
         // Two-Factor Authentication challenge routes (guest or mid-authentication)
         Route::middleware(array_merge(
             ['web'],
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
-            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
-            [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
+            [IdentifyPanel::class.':'.$this->getId()],
+            [HandleLocalization::class],
+            [SharePanelData::class]
         ))
             ->prefix($this->getPath())
             ->group(function () {
-                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class)) {
-                    Route::get('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'create'])
+                if (class_exists(TwoFactorChallenge::class)) {
+                    Route::get('two-factor/challenge', [TwoFactorChallenge::class, 'create'])
                         ->name($this->getId().'.two-factor.challenge');
 
-                    Route::post('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'store'])
+                    Route::post('two-factor/challenge', [TwoFactorChallenge::class, 'store'])
                         ->name($this->getId().'.two-factor.challenge.verify');
 
-                    Route::post('two-factor/resend', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'resend'])
+                    Route::post('two-factor/resend', [TwoFactorChallenge::class, 'resend'])
                         ->middleware(['throttle:3,1'])
                         ->name($this->getId().'.two-factor.resend');
                 }
 
-                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class)) {
-                    Route::get('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'create'])
+                if (class_exists(TwoFactorRecovery::class)) {
+                    Route::get('two-factor/recovery', [TwoFactorRecovery::class, 'create'])
                         ->name($this->getId().'.two-factor.recovery');
 
-                    Route::post('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'store'])
+                    Route::post('two-factor/recovery', [TwoFactorRecovery::class, 'store'])
                         ->name($this->getId().'.two-factor.recovery.verify');
                 }
 
                 // Passkey login routes (for 2FA alternative)
-                Route::get('passkey/login-options', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'loginOptions'])
+                Route::get('passkey/login-options', [PasskeyController::class, 'loginOptions'])
                     ->name($this->getId().'.passkey.login-options');
 
-                Route::post('passkey/login', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'login'])
+                Route::post('passkey/login', [PasskeyController::class, 'login'])
                     ->name($this->getId().'.passkey.login');
 
                 // Magic link routes (for 2FA alternative)
-                Route::post('magic-link/send', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'send'])
+                Route::post('magic-link/send', [MagicLinkController::class, 'send'])
                     ->middleware(['throttle:3,1'])
                     ->name($this->getId().'.magic-link.send');
 
-                Route::get('magic-link/verify/{token}', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'verify'])
+                Route::get('magic-link/verify/{token}', [MagicLinkController::class, 'verify'])
                     ->middleware(['signed'])
                     ->name($this->getId().'.magic-link.verify');
             });
@@ -1157,21 +1206,21 @@ trait HasAuth
         // IdentifyTenant must come BEFORE SharePanelData so tenant is set before sharing to frontend
         $authenticatedMiddleware = array_merge(
             ['web'],
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId()],
+            [IdentifyPanel::class.':'.$this->getId()],
             ['panel.auth'],
-            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
-            [\Laravilt\Panel\Middleware\IdentifyTenant::class],
-            [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
+            [HandleLocalization::class],
+            [IdentifyTenant::class],
+            [SharePanelData::class]
         );
 
         // Only add RequirePassword middleware if social login is enabled and requires password
         if ($this->hasSocialLogin() && $this->shouldRequirePasswordForSocialLogin()) {
-            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequirePassword::class;
+            $authenticatedMiddleware[] = RequirePassword::class;
         }
 
         // Only add RequireTwoFactorAuthentication middleware if 2FA is enabled for this panel
         if ($this->hasTwoFactor()) {
-            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication::class;
+            $authenticatedMiddleware[] = RequireTwoFactorAuthentication::class;
         }
 
         Route::middleware($authenticatedMiddleware)
@@ -1184,7 +1233,7 @@ trait HasAuth
                 }
 
                 // Quick locale update route
-                Route::post('locale', [\Laravilt\Panel\Http\Controllers\LocaleController::class, 'update'])
+                Route::post('locale', [LocaleController::class, 'update'])
                     ->name($this->getId().'.locale.update');
 
                 // Email verification verify route
@@ -1206,7 +1255,7 @@ trait HasAuth
                         $clusterSlug = $clusterClass::getSlug();
                         $pageSlug = $profilePage::getSlug();
                         Route::get($this->getProfilePath(), function () use ($clusterSlug, $pageSlug) {
-                            $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
+                            $panel = app(PanelRegistry::class)->getCurrent();
 
                             return redirect($panel->url("{$clusterSlug}/{$pageSlug}"));
                         })->name($this->getId().'.profile');
@@ -1232,7 +1281,7 @@ trait HasAuth
 
                     // Only register legacy routes if two-factor page is NOT in a cluster
                     if (! $twoFactorPage::getCluster()) {
-                        Route::get($this->getTwoFactorPath().'/status', [\Laravilt\Auth\Http\Controllers\TwoFactorAuthController::class, 'status'])
+                        Route::get($this->getTwoFactorPath().'/status', [TwoFactorAuthController::class, 'status'])
                             ->name($this->getId().'.two-factor.status');
 
                         Route::post($this->getTwoFactorPath().'/enable', [$twoFactorPage, 'enable'])
@@ -1287,13 +1336,13 @@ trait HasAuth
                 // Passkeys routes (only if not using cluster)
                 if ($this->hasPasskeys() && $passkeysPage = $this->getPasskeysPage()) {
                     if (! $passkeysPage::getCluster()) {
-                        Route::get($this->getPasskeysPath().'/register-options', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'registerOptions'])
+                        Route::get($this->getPasskeysPath().'/register-options', [PasskeyController::class, 'registerOptions'])
                             ->name($this->getId().'.passkeys.register-options');
 
-                        Route::post($this->getPasskeysPath().'/register', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'register'])
+                        Route::post($this->getPasskeysPath().'/register', [PasskeyController::class, 'register'])
                             ->name($this->getId().'.passkeys.register');
 
-                        Route::delete($this->getPasskeysPath().'/{credentialId}', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'destroy'])
+                        Route::delete($this->getPasskeysPath().'/{credentialId}', [PasskeyController::class, 'destroy'])
                             ->name($this->getId().'.passkeys.destroy');
                     }
                 }
@@ -1336,7 +1385,7 @@ trait HasAuth
             $guard = $this->getAuthGuard();
 
             // Use panel's custom auth middleware or default
-            $authMiddleware = \Laravilt\Panel\Http\Middleware\Authenticate::class;
+            $authMiddleware = Authenticate::class;
 
             if ($guard) {
                 $authMiddleware .= ":{$guard}";
@@ -1352,7 +1401,7 @@ trait HasAuth
     protected function ensureRequirePasswordMiddleware(): void
     {
         $currentMiddleware = $this->getMiddleware();
-        $requirePasswordClass = \Laravilt\Auth\Http\Middleware\RequirePassword::class;
+        $requirePasswordClass = RequirePassword::class;
 
         // Check if RequirePassword middleware is present
         $hasRequirePassword = collect($currentMiddleware)->contains($requirePasswordClass);
@@ -1409,93 +1458,93 @@ trait HasAuth
 
             // GET route (index, create, or edit)
             if ($reflection->hasMethod('index')) {
-                \Illuminate\Support\Facades\Route::get($pagePath, [$pageClass, 'index'])
+                Route::get($pagePath, [$pageClass, 'index'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}.index");
             } elseif ($reflection->hasMethod('edit')) {
-                \Illuminate\Support\Facades\Route::get($pagePath, [$pageClass, 'edit'])
+                Route::get($pagePath, [$pageClass, 'edit'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}.edit");
             } elseif ($reflection->hasMethod('create')) {
-                \Illuminate\Support\Facades\Route::get($pagePath, [$pageClass, 'create'])
+                Route::get($pagePath, [$pageClass, 'create'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}");
             }
 
             // POST route (store)
             if ($reflection->hasMethod('store')) {
-                \Illuminate\Support\Facades\Route::post($pagePath, [$pageClass, 'store'])
+                Route::post($pagePath, [$pageClass, 'store'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}.store");
             }
 
             // PATCH/PUT routes (update)
             if ($reflection->hasMethod('update')) {
-                \Illuminate\Support\Facades\Route::patch($pagePath, [$pageClass, 'update'])
+                Route::patch($pagePath, [$pageClass, 'update'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}.update");
 
-                \Illuminate\Support\Facades\Route::put($pagePath, [$pageClass, 'update']);
+                Route::put($pagePath, [$pageClass, 'update']);
             }
 
             // DELETE route (destroy)
             if ($reflection->hasMethod('destroy')) {
-                \Illuminate\Support\Facades\Route::delete($pagePath, [$pageClass, 'destroy'])
+                Route::delete($pagePath, [$pageClass, 'destroy'])
                     ->name($this->getId().".{$clusterSlug}.{$pageSlug}.destroy");
             }
         }
 
         // Also register the Two-Factor routes under the cluster if ManageTwoFactor is in the cluster
         if ($this->hasTwoFactor()) {
-            $twoFactorPage = \Laravilt\Auth\Pages\Profile\ManageTwoFactor::class;
+            $twoFactorPage = ManageTwoFactor::class;
             if (in_array($twoFactorPage, $clusterPages->toArray())) {
                 $twoFactorSlug = $twoFactorPage::getSlug();
                 $twoFactorPath = "{$clusterSlug}/{$twoFactorSlug}";
 
-                \Illuminate\Support\Facades\Route::post("{$twoFactorPath}/enable", [$twoFactorPage, 'enable'])
+                Route::post("{$twoFactorPath}/enable", [$twoFactorPage, 'enable'])
                     ->name($this->getId().'.two-factor.enable');
 
-                \Illuminate\Support\Facades\Route::post("{$twoFactorPath}/confirm", [$twoFactorPage, 'confirm'])
+                Route::post("{$twoFactorPath}/confirm", [$twoFactorPage, 'confirm'])
                     ->name($this->getId().'.two-factor.confirm');
 
-                \Illuminate\Support\Facades\Route::post("{$twoFactorPath}/cancel", [$twoFactorPage, 'cancel'])
+                Route::post("{$twoFactorPath}/cancel", [$twoFactorPage, 'cancel'])
                     ->name($this->getId().'.two-factor.cancel');
 
-                \Illuminate\Support\Facades\Route::delete("{$twoFactorPath}/disable", [$twoFactorPage, 'disable'])
+                Route::delete("{$twoFactorPath}/disable", [$twoFactorPage, 'disable'])
                     ->name($this->getId().'.two-factor.disable');
 
-                \Illuminate\Support\Facades\Route::post("{$twoFactorPath}/recovery-codes", [$twoFactorPage, 'regenerateRecoveryCodes'])
+                Route::post("{$twoFactorPath}/recovery-codes", [$twoFactorPage, 'regenerateRecoveryCodes'])
                     ->name($this->getId().'.two-factor.recovery-codes');
             }
         }
 
         // Also register the API Token routes under the cluster if ManageApiTokens is in the cluster
         if ($this->hasApiTokens()) {
-            $apiTokensPage = \Laravilt\Auth\Pages\Profile\ManageApiTokens::class;
+            $apiTokensPage = ManageApiTokens::class;
             if (in_array($apiTokensPage, $clusterPages->toArray())) {
                 $apiTokensSlug = $apiTokensPage::getSlug();
                 $apiTokensPath = "{$clusterSlug}/{$apiTokensSlug}";
 
-                \Illuminate\Support\Facades\Route::post("{$apiTokensPath}/store", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'store'])
+                Route::post("{$apiTokensPath}/store", [ApiTokenController::class, 'store'])
                     ->name($this->getId().'.api-tokens.store');
 
-                \Illuminate\Support\Facades\Route::delete("{$apiTokensPath}/{token}", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'destroy'])
+                Route::delete("{$apiTokensPath}/{token}", [ApiTokenController::class, 'destroy'])
                     ->name($this->getId().'.api-tokens.destroy');
 
-                \Illuminate\Support\Facades\Route::post("{$apiTokensPath}/revoke-all", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'revokeAll'])
+                Route::post("{$apiTokensPath}/revoke-all", [ApiTokenController::class, 'revokeAll'])
                     ->name($this->getId().'.api-tokens.revoke-all');
             }
         }
 
         // Also register the Passkeys routes under the cluster if ManagePasskeys is in the cluster
         if ($this->hasPasskeys()) {
-            $passkeysPage = \Laravilt\Auth\Pages\Profile\ManagePasskeys::class;
+            $passkeysPage = ManagePasskeys::class;
             if (in_array($passkeysPage, $clusterPages->toArray())) {
                 $passkeysSlug = $passkeysPage::getSlug();
                 $passkeysPath = "{$clusterSlug}/{$passkeysSlug}";
 
-                \Illuminate\Support\Facades\Route::get("{$passkeysPath}/register-options", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'registerOptions'])
+                Route::get("{$passkeysPath}/register-options", [PasskeyController::class, 'registerOptions'])
                     ->name($this->getId().'.passkeys.register-options');
 
-                \Illuminate\Support\Facades\Route::post("{$passkeysPath}/register", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'register'])
+                Route::post("{$passkeysPath}/register", [PasskeyController::class, 'register'])
                     ->name($this->getId().'.passkeys.register');
 
-                \Illuminate\Support\Facades\Route::delete("{$passkeysPath}/{credentialId}", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'destroy'])
+                Route::delete("{$passkeysPath}/{credentialId}", [PasskeyController::class, 'destroy'])
                     ->name($this->getId().'.passkeys.destroy');
             }
         }
@@ -1518,10 +1567,10 @@ trait HasAuth
         // Guest routes (login, register, password reset, etc.)
         Route::middleware([
             'web',
-            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
-            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
-            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
-            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+            IdentifyPanel::class.':'.$this->getId(),
+            InitializeTenancyBySubdomain::class,
+            HandleLocalization::class,
+            SharePanelData::class,
         ])
             ->domain('{tenant}.'.$domain)
             ->prefix($this->getPath())
@@ -1598,11 +1647,11 @@ trait HasAuth
                 }
 
                 // Social Login routes
-                if ($this->hasSocialLogin() && class_exists(\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class)) {
-                    Route::get('auth/{provider}/redirect', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'redirect'])
+                if ($this->hasSocialLogin() && class_exists(SocialAuthController::class)) {
+                    Route::get('auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])
                         ->name($namePrefix.'.auth.social.redirect');
 
-                    Route::get('auth/{provider}/callback', [\Laravilt\Auth\Http\Controllers\Auth\SocialAuthController::class, 'callback'])
+                    Route::get('auth/{provider}/callback', [SocialAuthController::class, 'callback'])
                         ->name($namePrefix.'.auth.social.callback');
                 }
             });
@@ -1610,47 +1659,47 @@ trait HasAuth
         // Two-Factor Authentication challenge routes (guest or mid-authentication)
         Route::middleware([
             'web',
-            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
-            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
-            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
-            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+            IdentifyPanel::class.':'.$this->getId(),
+            InitializeTenancyBySubdomain::class,
+            HandleLocalization::class,
+            SharePanelData::class,
         ])
             ->domain('{tenant}.'.$domain)
             ->prefix($this->getPath())
             ->group(function () use ($namePrefix) {
-                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class)) {
-                    Route::get('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'create'])
+                if (class_exists(TwoFactorChallenge::class)) {
+                    Route::get('two-factor/challenge', [TwoFactorChallenge::class, 'create'])
                         ->name($namePrefix.'.two-factor.challenge');
 
-                    Route::post('two-factor/challenge', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'store'])
+                    Route::post('two-factor/challenge', [TwoFactorChallenge::class, 'store'])
                         ->name($namePrefix.'.two-factor.challenge.verify');
 
-                    Route::post('two-factor/resend', [\Laravilt\Auth\Pages\Auth\TwoFactorChallenge::class, 'resend'])
+                    Route::post('two-factor/resend', [TwoFactorChallenge::class, 'resend'])
                         ->middleware(['throttle:3,1'])
                         ->name($namePrefix.'.two-factor.resend');
                 }
 
-                if (class_exists(\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class)) {
-                    Route::get('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'create'])
+                if (class_exists(TwoFactorRecovery::class)) {
+                    Route::get('two-factor/recovery', [TwoFactorRecovery::class, 'create'])
                         ->name($namePrefix.'.two-factor.recovery');
 
-                    Route::post('two-factor/recovery', [\Laravilt\Auth\Pages\Auth\TwoFactorRecovery::class, 'store'])
+                    Route::post('two-factor/recovery', [TwoFactorRecovery::class, 'store'])
                         ->name($namePrefix.'.two-factor.recovery.verify');
                 }
 
                 // Passkey login routes (for 2FA alternative)
-                Route::get('passkey/login-options', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'loginOptions'])
+                Route::get('passkey/login-options', [PasskeyController::class, 'loginOptions'])
                     ->name($namePrefix.'.passkey.login-options');
 
-                Route::post('passkey/login', [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'login'])
+                Route::post('passkey/login', [PasskeyController::class, 'login'])
                     ->name($namePrefix.'.passkey.login');
 
                 // Magic link routes (for 2FA alternative)
-                Route::post('magic-link/send', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'send'])
+                Route::post('magic-link/send', [MagicLinkController::class, 'send'])
                     ->middleware(['throttle:3,1'])
                     ->name($namePrefix.'.magic-link.send');
 
-                Route::get('magic-link/verify/{token}', [\Laravilt\Auth\Http\Controllers\MagicLinkController::class, 'verify'])
+                Route::get('magic-link/verify/{token}', [MagicLinkController::class, 'verify'])
                     ->middleware(['signed'])
                     ->name($namePrefix.'.magic-link.verify');
             });
@@ -1658,22 +1707,22 @@ trait HasAuth
         // Authenticated routes
         $authenticatedMiddleware = [
             'web',
-            \Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$this->getId(),
-            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class,
+            IdentifyPanel::class.':'.$this->getId(),
+            InitializeTenancyBySubdomain::class,
             'panel.auth',
-            \Laravilt\Panel\Http\Middleware\HandleLocalization::class,
-            \Laravilt\Panel\Middleware\IdentifyTenant::class,
-            \Laravilt\Panel\Http\Middleware\SharePanelData::class,
+            HandleLocalization::class,
+            IdentifyTenant::class,
+            SharePanelData::class,
         ];
 
         // Only add RequirePassword middleware if social login is enabled and requires password
         if ($this->hasSocialLogin() && $this->shouldRequirePasswordForSocialLogin()) {
-            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequirePassword::class;
+            $authenticatedMiddleware[] = RequirePassword::class;
         }
 
         // Only add RequireTwoFactorAuthentication middleware if 2FA is enabled for this panel
         if ($this->hasTwoFactor()) {
-            $authenticatedMiddleware[] = \Laravilt\Auth\Http\Middleware\RequireTwoFactorAuthentication::class;
+            $authenticatedMiddleware[] = RequireTwoFactorAuthentication::class;
         }
 
         Route::middleware($authenticatedMiddleware)
@@ -1687,7 +1736,7 @@ trait HasAuth
                 }
 
                 // Quick locale update route
-                Route::post('locale', [\Laravilt\Panel\Http\Controllers\LocaleController::class, 'update'])
+                Route::post('locale', [LocaleController::class, 'update'])
                     ->name($namePrefix.'.locale.update');
 
                 // Email verification verify route
@@ -1709,7 +1758,7 @@ trait HasAuth
                         $clusterSlug = $clusterClass::getSlug();
                         $pageSlug = $profilePage::getSlug();
                         Route::get($this->getProfilePath(), function () use ($clusterSlug, $pageSlug) {
-                            $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
+                            $panel = app(PanelRegistry::class)->getCurrent();
 
                             return redirect($panel->url("{$clusterSlug}/{$pageSlug}"));
                         })->name($namePrefix.'.profile');

@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Laravilt\Panel\Events\TenantCreated;
 use Laravilt\Panel\Models\Domain;
 use Laravilt\Panel\Models\Tenant;
@@ -33,7 +34,7 @@ class TenantCreateCommand extends Command
     public function handle(MultiDatabaseManager $manager): int
     {
         $name = $this->argument('name');
-        $slug = $this->option('slug') ?: \Illuminate\Support\Str::slug($name);
+        $slug = $this->option('slug') ?: Str::slug($name);
         $email = $this->option('email');
         $subdomain = $this->option('domain') ?: $slug;
 

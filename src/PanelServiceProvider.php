@@ -2,9 +2,32 @@
 
 namespace Laravilt\Panel;
 
+use Illuminate\Auth\Middleware\Authorize;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Response;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
+use Illuminate\Routing\Router;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Inertia\Inertia;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
+use Laravilt\Auth\Http\Controllers\ApiTokenController;
+use Laravilt\Auth\Http\Controllers\PasskeyController;
+use Laravilt\Auth\Pages\Profile\ManageApiTokens;
+use Laravilt\Auth\Pages\Profile\ManagePasskeys;
+use Laravilt\Auth\Pages\Profile\ManageTwoFactor;
+use Laravilt\Notifications\Notification;
 use Laravilt\Panel\Events\TenantCreated;
 use Laravilt\Panel\Events\TenantDatabaseCreated;
 use Laravilt\Panel\Events\TenantDeleted;
@@ -14,7 +37,14 @@ use Laravilt\Panel\Listeners\DeleteTenantDatabaseListener;
 use Laravilt\Panel\Listeners\MigrateTenantDatabaseListener;
 use Laravilt\Panel\Listeners\SeedTenantDatabaseListener;
 use Laravilt\Panel\Middleware\IdentifyPanel;
+use Laravilt\Panel\Middleware\InitializeTenancyBySubdomain;
+use Laravilt\Panel\Pages\ListRecords;
+use Laravilt\Panel\Pages\ManageRecords;
+use Laravilt\Panel\Resources\NestedResource;
 use Laravilt\Panel\Tenancy\MultiDatabaseManager;
+use Laravilt\Tables\ApiResource;
+use Laravilt\Tables\Columns\ToggleColumn;
+use Laravilt\Tables\Table;
 
 class PanelServiceProvider extends ServiceProvider
 {
@@ -116,7 +146,7 @@ class PanelServiceProvider extends ServiceProvider
         ], 'laravilt-teams-trait');
 
         // Register panel's custom Authenticate middleware as 'panel.auth' alias
-        $router = $this->app->make(\Illuminate\Routing\Router::class);
+        $router = $this->app->make(Router::class);
         $router->aliasMiddleware('panel.auth', Http\Middleware\Authenticate::class);
 
         // Configure middleware priority to ensure IdentifyPanel runs BEFORE auth middleware
@@ -135,27 +165,27 @@ class PanelServiceProvider extends ServiceProvider
      * specified in a certain order in routes. This ensures IdentifyPanel always
      * runs before any auth middleware so the panel context is set correctly.
      */
-    protected function configureMiddlewarePriority(\Illuminate\Routing\Router $router): void
+    protected function configureMiddlewarePriority(Router $router): void
     {
         $router->middlewarePriority = [
-            \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
-            \Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests::class,
-            \Illuminate\Cookie\Middleware\EncryptCookies::class,
-            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
-            \Illuminate\Session\Middleware\StartSession::class,
-            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-            \Laravilt\Panel\Middleware\IdentifyPanel::class, // Must come BEFORE AuthenticatesRequests
-            \Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class, // Multi-db tenancy initialization
-            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
-            \Illuminate\Routing\Middleware\ThrottleRequests::class,
-            \Illuminate\Routing\Middleware\ThrottleRequestsWithRedis::class,
-            \Illuminate\Contracts\Session\Middleware\AuthenticatesSessions::class,
-            \Illuminate\Routing\Middleware\SubstituteBindings::class,
-            \Illuminate\Auth\Middleware\Authorize::class,
+            EnsureFrontendRequestsAreStateful::class,
+            HandlePrecognitiveRequests::class,
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            ShareErrorsFromSession::class,
+            IdentifyPanel::class, // Must come BEFORE AuthenticatesRequests
+            InitializeTenancyBySubdomain::class, // Multi-db tenancy initialization
+            AuthenticatesRequests::class,
+            ThrottleRequests::class,
+            ThrottleRequestsWithRedis::class,
+            AuthenticatesSessions::class,
+            SubstituteBindings::class,
+            Authorize::class,
         ];
 
         // Register middleware alias for multi-database tenancy
-        $router->aliasMiddleware('tenancy.subdomain', Middleware\InitializeTenancyBySubdomain::class);
+        $router->aliasMiddleware('tenancy.subdomain', InitializeTenancyBySubdomain::class);
         $router->aliasMiddleware('tenancy.central', Middleware\PreventAccessFromCentralDomains::class);
     }
 
@@ -192,7 +222,7 @@ class PanelServiceProvider extends ServiceProvider
                 // For multi-database panels, InitializeTenancyBySubdomain must come BEFORE
                 // IdentifyTenant and SharePanelData because those may query the database
                 $tenancyMiddleware = $panel->isMultiDatabaseTenancy()
-                    ? [Middleware\InitializeTenancyBySubdomain::class]
+                    ? [InitializeTenancyBySubdomain::class]
                     : [];
 
                 $routeMiddleware = array_merge(
@@ -342,7 +372,7 @@ class PanelServiceProvider extends ServiceProvider
         // Check if this is a simple resource (uses ManageRecords page)
         $isSimpleResource = false;
         foreach ($pages as $pageName => $pageConfig) {
-            if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+            if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                 $isSimpleResource = true;
                 break;
             }
@@ -403,7 +433,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Skip if not a NestedResource
-            if (! is_subclass_of($nestedResourceClass, \Laravilt\Panel\Resources\NestedResource::class)) {
+            if (! is_subclass_of($nestedResourceClass, NestedResource::class)) {
                 continue;
             }
 
@@ -452,7 +482,7 @@ class PanelServiceProvider extends ServiceProvider
                     ];
                     $props['breadcrumbs'] = $nestedResourceClass::getBreadcrumbs();
 
-                    return \Inertia\Inertia::render($page->getView(), $props);
+                    return Inertia::render($page->getView(), $props);
                 })->name($routeName);
             }
 
@@ -465,8 +495,8 @@ class PanelServiceProvider extends ServiceProvider
                 $pages = $nestedResourceClass::getPages();
                 foreach ($pages as $pageConfig) {
                     $pageClass = $pageConfig['class'];
-                    if (is_subclass_of($pageClass, \Laravilt\Panel\Pages\ListRecords::class) ||
-                        is_subclass_of($pageClass, \Laravilt\Panel\Pages\ManageRecords::class)) {
+                    if (is_subclass_of($pageClass, ListRecords::class) ||
+                        is_subclass_of($pageClass, ManageRecords::class)) {
                         $page = app($pageClass);
 
                         return $page->index(request());
@@ -499,7 +529,7 @@ class PanelServiceProvider extends ServiceProvider
                 $childRelationship = $nestedResourceClass::getChildRelationship();
                 if (method_exists($parentRecord, $childRelationship)) {
                     $relation = $parentRecord->{$childRelationship}();
-                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                    if ($relation instanceof BelongsToMany) {
                         $relation->attach($record->getKey());
                     }
                 }
@@ -585,7 +615,7 @@ class PanelServiceProvider extends ServiceProvider
         Route::get($slug.'/data', function () use ($resourceClass) {
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     return $page->index(request());
@@ -599,7 +629,7 @@ class PanelServiceProvider extends ServiceProvider
         Route::post($slug, function () use ($resourceClass) {
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     return $page->store(request());
@@ -615,7 +645,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     // For AJAX requests (non-Inertia), return JSON data
@@ -638,7 +668,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     return $page->update(request(), $id);
@@ -654,7 +684,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     return $page->destroy(request(), $id);
@@ -668,7 +698,7 @@ class PanelServiceProvider extends ServiceProvider
         Route::post($slug.'/bulk-delete', function () use ($resourceClass) {
             $pages = $resourceClass::getPages();
             foreach ($pages as $pageConfig) {
-                if (is_subclass_of($pageConfig['class'], \Laravilt\Panel\Pages\ManageRecords::class)) {
+                if (is_subclass_of($pageConfig['class'], ManageRecords::class)) {
                     $page = app($pageConfig['class']);
 
                     return $page->bulkDelete(request());
@@ -697,7 +727,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Get the table configuration to find the column and its callbacks
-            $table = new \Laravilt\Tables\Table;
+            $table = new Table;
             $table = $resourceClass::table($table);
             $columns = $table->getColumns();
 
@@ -716,7 +746,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Execute beforeStateUpdated callback if exists
-            if ($columnConfig instanceof \Laravilt\Tables\Columns\ToggleColumn) {
+            if ($columnConfig instanceof ToggleColumn) {
                 $beforeCallback = $columnConfig->getBeforeStateUpdated();
                 if ($beforeCallback) {
                     $beforeCallback($record, $column, $value);
@@ -727,7 +757,7 @@ class PanelServiceProvider extends ServiceProvider
             $record->update([$column => $value]);
 
             // Execute afterStateUpdated callback if exists
-            if ($columnConfig instanceof \Laravilt\Tables\Columns\ToggleColumn) {
+            if ($columnConfig instanceof ToggleColumn) {
                 $afterCallback = $columnConfig->getAfterStateUpdated();
                 if ($afterCallback) {
                     $afterCallback($record, $column, $value);
@@ -773,7 +803,7 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // For Inertia/full page requests, use session flash notification
-            \Laravilt\Notifications\Notification::success()
+            Notification::success()
                 ->title(__('notifications::notifications.success'))
                 ->body(__('notifications::notifications.records_reordered', ['count' => count($items)]))
                 ->send();
@@ -877,7 +907,7 @@ class PanelServiceProvider extends ServiceProvider
             $newRecord = $record->{$relationship}()->create($data);
 
             // Send success notification
-            \Laravilt\Notifications\Notification::success()
+            Notification::success()
                 ->title(__('notifications::notifications.success'))
                 ->body(__('notifications::notifications.record_created'))
                 ->send();
@@ -925,7 +955,7 @@ class PanelServiceProvider extends ServiceProvider
             $relatedRecord->update(request()->all());
 
             // Send success notification
-            \Laravilt\Notifications\Notification::success()
+            Notification::success()
                 ->title(__('notifications::notifications.success'))
                 ->body(__('notifications::notifications.record_updated'))
                 ->send();
@@ -973,7 +1003,7 @@ class PanelServiceProvider extends ServiceProvider
             $relatedRecord->delete();
 
             // Send success notification
-            \Laravilt\Notifications\Notification::success()
+            Notification::success()
                 ->title(__('notifications::notifications.success'))
                 ->body(__('notifications::notifications.record_deleted'))
                 ->send();
@@ -1028,7 +1058,7 @@ class PanelServiceProvider extends ServiceProvider
             $deletedCount = $record->{$relationship}()->whereIn('id', $ids)->delete();
 
             // Send success notification
-            \Laravilt\Notifications\Notification::success()
+            Notification::success()
                 ->title(__('notifications::notifications.success'))
                 ->body(__('notifications::notifications.records_deleted', ['count' => $deletedCount]))
                 ->send();
@@ -1117,7 +1147,7 @@ class PanelServiceProvider extends ServiceProvider
     /**
      * Register the actual API endpoints.
      */
-    protected function registerApiEndpoints(string $apiPrefix, string $routeNamePrefix, string $resourceClass, string $modelClass, ?\Laravilt\Tables\ApiResource $apiResource = null): void
+    protected function registerApiEndpoints(string $apiPrefix, string $routeNamePrefix, string $resourceClass, string $modelClass, ?ApiResource $apiResource = null): void
     {
         // Helper to get middleware for an operation
         $getMiddleware = function (string $operation) use ($apiResource): array {
@@ -1366,7 +1396,7 @@ class PanelServiceProvider extends ServiceProvider
      * Register custom action routes for a resource.
      */
     protected function registerCustomActionRoutes(
-        \Laravilt\Tables\ApiResource $apiResource,
+        ApiResource $apiResource,
         string $apiPrefix,
         string $routeNamePrefix,
         string $modelClass
@@ -1388,7 +1418,7 @@ class PanelServiceProvider extends ServiceProvider
 
                     $result = $action->execute($record, request());
 
-                    if ($result instanceof \Illuminate\Http\Response || $result instanceof \Illuminate\Http\JsonResponse) {
+                    if ($result instanceof Response || $result instanceof JsonResponse) {
                         return $result;
                     }
 
@@ -1438,7 +1468,7 @@ class PanelServiceProvider extends ServiceProvider
 
                     $result = $action->execute(null, request());
 
-                    if ($result instanceof \Illuminate\Http\Response || $result instanceof \Illuminate\Http\JsonResponse) {
+                    if ($result instanceof Response || $result instanceof JsonResponse) {
                         return $result;
                     }
 
@@ -1658,8 +1688,8 @@ class PanelServiceProvider extends ServiceProvider
     protected function registerAuthSpecialRoutesForSubdomain(Panel $panel): void
     {
         // Two-Factor Authentication routes
-        if ($panel->hasTwoFactor() && class_exists(\Laravilt\Auth\Pages\Profile\ManageTwoFactor::class)) {
-            $twoFactorPage = \Laravilt\Auth\Pages\Profile\ManageTwoFactor::class;
+        if ($panel->hasTwoFactor() && class_exists(ManageTwoFactor::class)) {
+            $twoFactorPage = ManageTwoFactor::class;
             $cluster = $twoFactorPage::getCluster();
 
             if ($cluster) {
@@ -1685,8 +1715,8 @@ class PanelServiceProvider extends ServiceProvider
         }
 
         // API Tokens routes
-        if ($panel->hasApiTokens() && class_exists(\Laravilt\Auth\Pages\Profile\ManageApiTokens::class)) {
-            $apiTokensPage = \Laravilt\Auth\Pages\Profile\ManageApiTokens::class;
+        if ($panel->hasApiTokens() && class_exists(ManageApiTokens::class)) {
+            $apiTokensPage = ManageApiTokens::class;
             $cluster = $apiTokensPage::getCluster();
 
             if ($cluster) {
@@ -1694,20 +1724,20 @@ class PanelServiceProvider extends ServiceProvider
                 $apiTokensSlug = $apiTokensPage::getSlug();
                 $apiTokensPath = "{$clusterSlug}/{$apiTokensSlug}";
 
-                Route::post("{$apiTokensPath}/store", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'store'])
+                Route::post("{$apiTokensPath}/store", [ApiTokenController::class, 'store'])
                     ->name('api-tokens.store');
 
-                Route::delete("{$apiTokensPath}/{token}", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'destroy'])
+                Route::delete("{$apiTokensPath}/{token}", [ApiTokenController::class, 'destroy'])
                     ->name('api-tokens.destroy');
 
-                Route::post("{$apiTokensPath}/revoke-all", [\Laravilt\Auth\Http\Controllers\ApiTokenController::class, 'revokeAll'])
+                Route::post("{$apiTokensPath}/revoke-all", [ApiTokenController::class, 'revokeAll'])
                     ->name('api-tokens.revoke-all');
             }
         }
 
         // Passkeys routes
-        if ($panel->hasPasskeys() && class_exists(\Laravilt\Auth\Pages\Profile\ManagePasskeys::class)) {
-            $passkeysPage = \Laravilt\Auth\Pages\Profile\ManagePasskeys::class;
+        if ($panel->hasPasskeys() && class_exists(ManagePasskeys::class)) {
+            $passkeysPage = ManagePasskeys::class;
             $cluster = $passkeysPage::getCluster();
 
             if ($cluster) {
@@ -1715,13 +1745,13 @@ class PanelServiceProvider extends ServiceProvider
                 $passkeysSlug = $passkeysPage::getSlug();
                 $passkeysPath = "{$clusterSlug}/{$passkeysSlug}";
 
-                Route::get("{$passkeysPath}/register-options", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'registerOptions'])
+                Route::get("{$passkeysPath}/register-options", [PasskeyController::class, 'registerOptions'])
                     ->name('passkeys.register-options');
 
-                Route::post("{$passkeysPath}/register", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'register'])
+                Route::post("{$passkeysPath}/register", [PasskeyController::class, 'register'])
                     ->name('passkeys.register');
 
-                Route::delete("{$passkeysPath}/{credentialId}", [\Laravilt\Auth\Http\Controllers\PasskeyController::class, 'destroy'])
+                Route::delete("{$passkeysPath}/{credentialId}", [PasskeyController::class, 'destroy'])
                     ->name('passkeys.destroy');
             }
         }

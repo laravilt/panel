@@ -22,6 +22,7 @@ use Laravilt\Panel\Concerns\HasTenancy;
 use Laravilt\Panel\Concerns\HasTheme;
 use Laravilt\Panel\Concerns\HasWidgets;
 use Laravilt\Panel\Discovery\PanelDiscovery;
+use Laravilt\Panel\Navigation\UserMenu;
 
 class Panel
 {
@@ -152,7 +153,7 @@ class Panel
      */
     public function getUserMenu(): array
     {
-        $menu = new \Laravilt\Panel\Navigation\UserMenu;
+        $menu = new UserMenu;
 
         // If custom user menu callback is set, use it
         if ($this->userMenuCallback) {

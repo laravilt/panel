@@ -4,11 +4,21 @@ declare(strict_types=1);
 
 namespace Laravilt\Panel\Pages;
 
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Laravilt\Actions\Action;
+use Laravilt\Actions\CreateAction;
 use Laravilt\Actions\DeleteBulkAction;
+use Laravilt\Actions\ForceDeleteBulkAction;
+use Laravilt\Actions\RestoreBulkAction;
 use Laravilt\Infolists\Infolist;
+use Laravilt\Notifications\Notification;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\Table;
 
@@ -204,7 +214,7 @@ abstract class ManageRecords extends ListRecords
      * Get the create action configured for this resource.
      * Use CreateAction::make() in your headerActions() and customize as needed.
      */
-    protected function getCreateAction(): \Laravilt\Actions\CreateAction
+    protected function getCreateAction(): CreateAction
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
@@ -212,7 +222,7 @@ abstract class ManageRecords extends ListRecords
         $slug = $resource::getSlug();
         $page = $this;
 
-        return \Laravilt\Actions\CreateAction::make()
+        return CreateAction::make()
             ->stableId("{$slug}_create")
             ->label(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
             ->modalHeading(__('actions::actions.buttons.create').' '.$this->getResourceLabel())
@@ -246,7 +256,7 @@ abstract class ManageRecords extends ListRecords
                 // Associate record with tenant via many-to-many if applicable
                 $resource::associateRecordWithTenantManyToMany($record);
 
-                \Laravilt\Notifications\Notification::success()
+                Notification::success()
                     ->title(__('notifications::notifications.success'))
                     ->body(__('notifications::notifications.record_created'))
                     ->send();
@@ -291,7 +301,7 @@ abstract class ManageRecords extends ListRecords
                     $relation = $modelInstance->{$key}();
 
                     // Check if it's a BelongsToMany relationship
-                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                    if ($relation instanceof BelongsToMany) {
                         $relationships[$key] = $value;
                         unset($data[$key]);
                     }
@@ -310,7 +320,7 @@ abstract class ManageRecords extends ListRecords
      *
      * @param  array<string, mixed>  $relationships
      */
-    protected function syncRelationships(\Illuminate\Database\Eloquent\Model $record, array $relationships): void
+    protected function syncRelationships(Model $record, array $relationships): void
     {
         foreach ($relationships as $relationName => $relationData) {
             if ($relationData !== null) {
@@ -421,7 +431,7 @@ abstract class ManageRecords extends ListRecords
                     // Sync many-to-many relationships from form data
                     $page->syncRelationships($existingRecord, $relationships);
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('notifications::notifications.success'))
                         ->body(__('actions::actions.messages.saved'))
                         ->send();
@@ -464,7 +474,7 @@ abstract class ManageRecords extends ListRecords
 
                     $existingRecord->delete();
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('notifications::notifications.success'))
                         ->body(__('notifications::notifications.record_deleted'))
                         ->send();
@@ -479,7 +489,7 @@ abstract class ManageRecords extends ListRecords
                 ->model($modelClass)
                 ->action(function (array $ids) use ($modelClass, $resource) {
                     if (empty($ids)) {
-                        \Laravilt\Notifications\Notification::warning()
+                        Notification::warning()
                             ->title(__('tables::tables.bulk.no_selection_title'))
                             ->body(__('tables::tables.bulk.no_selection_body'))
                             ->send();
@@ -494,7 +504,7 @@ abstract class ManageRecords extends ListRecords
 
                     $deleted = $modelClass::whereIn('id', $ids)->delete();
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('actions::actions.states.success'))
                         ->body(__('tables::tables.messages.bulk_deleted', ['count' => $deleted]))
                         ->send();
@@ -502,14 +512,14 @@ abstract class ManageRecords extends ListRecords
         }
 
         // Only add restore/force delete actions if model uses SoftDeletes
-        $usesSoftDeletes = in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($modelClass));
+        $usesSoftDeletes = in_array(SoftDeletes::class, class_uses_recursive($modelClass));
 
         if ($usesSoftDeletes && $this->canRestore()) {
-            $bulkActions[] = \Laravilt\Actions\RestoreBulkAction::make()
+            $bulkActions[] = RestoreBulkAction::make()
                 ->model($modelClass)
                 ->action(function (array $ids) use ($modelClass, $resource) {
                     if (empty($ids)) {
-                        \Laravilt\Notifications\Notification::warning()
+                        Notification::warning()
                             ->title(__('tables::tables.bulk.no_selection_title'))
                             ->body(__('tables::tables.bulk.no_selection_body'))
                             ->send();
@@ -524,7 +534,7 @@ abstract class ManageRecords extends ListRecords
 
                     $restored = $modelClass::withTrashed()->whereIn('id', $ids)->restore();
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('actions::actions.states.success'))
                         ->body(__('actions::actions.messages.bulk_restored', ['count' => $restored]))
                         ->send();
@@ -532,11 +542,11 @@ abstract class ManageRecords extends ListRecords
         }
 
         if ($usesSoftDeletes && $this->canForceDelete()) {
-            $bulkActions[] = \Laravilt\Actions\ForceDeleteBulkAction::make()
+            $bulkActions[] = ForceDeleteBulkAction::make()
                 ->model($modelClass)
                 ->action(function (array $ids) use ($modelClass, $resource) {
                     if (empty($ids)) {
-                        \Laravilt\Notifications\Notification::warning()
+                        Notification::warning()
                             ->title(__('tables::tables.bulk.no_selection_title'))
                             ->body(__('tables::tables.bulk.no_selection_body'))
                             ->send();
@@ -551,7 +561,7 @@ abstract class ManageRecords extends ListRecords
 
                     $deleted = $modelClass::withTrashed()->whereIn('id', $ids)->forceDelete();
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('actions::actions.states.success'))
                         ->body(__('actions::actions.messages.bulk_force_deleted', ['count' => $deleted]))
                         ->send();
@@ -605,7 +615,7 @@ abstract class ManageRecords extends ListRecords
      *
      * @param  array  $formData  Current form data
      */
-    public function getFormSchema(array $formData = []): \Laravilt\Schemas\Schema
+    public function getFormSchema(array $formData = []): Schema
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
@@ -724,7 +734,7 @@ abstract class ManageRecords extends ListRecords
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    protected function loadRelationshipDataForRecord(\Illuminate\Database\Eloquent\Model $record, array $data): array
+    protected function loadRelationshipDataForRecord(Model $record, array $data): array
     {
         $reflectionClass = new \ReflectionClass($record);
         $modelClass = $record::class;
@@ -762,11 +772,11 @@ abstract class ManageRecords extends ListRecords
                 $relation = $record->{$methodName}();
 
                 // Check if it's a BelongsToMany relationship - load IDs
-                if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                if ($relation instanceof BelongsToMany) {
                     $data[$methodName] = $record->{$methodName}()->pluck($relation->getRelated()->getTable().'.id')->toArray();
                 }
                 // Check if it's a HasMany relationship - load full records (for Repeaters)
-                elseif ($relation instanceof \Illuminate\Database\Eloquent\Relations\HasMany) {
+                elseif ($relation instanceof HasMany) {
                     $data[$methodName] = $record->{$methodName}()->get()->toArray();
                 }
             } catch (\Throwable $e) {
@@ -807,10 +817,10 @@ abstract class ManageRecords extends ListRecords
             $props['selectedRecordId'] = $id;
             $props['autoOpenModal'] = 'view'; // or 'edit' based on user preference
 
-            return \Inertia\Inertia::render($this->getView(), $props);
-        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return Inertia::render($this->getView(), $props);
+        } catch (ModelNotFoundException $e) {
             // Record not found - redirect to index with error notification
-            \Laravilt\Notifications\Notification::danger()
+            Notification::danger()
                 ->title(__('notifications::notifications.error'))
                 ->body(__('notifications::notifications.record_not_found'))
                 ->send();
@@ -819,7 +829,7 @@ abstract class ManageRecords extends ListRecords
             return redirect()->back()->withErrors(['record' => 'Record not found']);
         } catch (\Exception $e) {
             // Other errors - redirect back with error
-            \Laravilt\Notifications\Notification::danger()
+            Notification::danger()
                 ->title(__('notifications::notifications.error'))
                 ->body($e->getMessage())
                 ->send();

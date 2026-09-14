@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Pages\TenantSettings;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
@@ -221,12 +222,12 @@ class TeamProfile extends Page
         // Clear cache by domain
         if ($baseDomain) {
             $fullDomain = "{$tenant->{$slugAttribute}}.{$baseDomain}";
-            \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}domain_{$fullDomain}");
+            Cache::forget("{$cachePrefix}domain_{$fullDomain}");
         }
 
         // Also clear by slug just in case
-        \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}slug_{$tenant->{$slugAttribute}}");
-        \Illuminate\Support\Facades\Cache::forget("{$cachePrefix}id_{$tenant->getKey()}");
+        Cache::forget("{$cachePrefix}slug_{$tenant->{$slugAttribute}}");
+        Cache::forget("{$cachePrefix}id_{$tenant->getKey()}");
     }
 
     /**

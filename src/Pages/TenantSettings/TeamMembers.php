@@ -2,6 +2,7 @@
 
 namespace Laravilt\Panel\Pages\TenantSettings;
 
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravilt\Actions\Action;
@@ -133,7 +134,7 @@ class TeamMembers extends Page
             return back()->withErrors(['team' => 'You are not authorized to invite members.']);
         }
 
-        $userModel = config('auth.providers.users.model', \App\Models\User::class);
+        $userModel = config('auth.providers.users.model', User::class);
         $invitedUser = $userModel::where('email', $data['email'])->first();
 
         if (! $invitedUser) {

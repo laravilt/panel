@@ -6,9 +6,15 @@ namespace Laravilt\Panel\Resources;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Laravilt\AI\AIAgent;
+use Laravilt\Flutter\Flutter;
+use Laravilt\Forms\Form;
+use Laravilt\Infolists\InfoList;
 use Laravilt\Panel\Concerns\HasResourceAuthorization;
 use Laravilt\Panel\Facades\Laravilt;
+use Laravilt\Panel\Panel;
+use Laravilt\Panel\PanelRegistry;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\ApiResource;
 use Laravilt\Tables\Table;
@@ -79,7 +85,7 @@ abstract class Resource
 
     public static function makeForm(): Schema
     {
-        $form = new \Laravilt\Forms\Form;
+        $form = new Form;
         $form->model(static::$model);
 
         return $form;
@@ -92,7 +98,7 @@ abstract class Resource
 
     public static function makeInfoList(): Schema
     {
-        return new \Laravilt\Infolists\InfoList;
+        return new InfoList;
     }
 
     public static function form(Schema $schema): Schema
@@ -192,7 +198,7 @@ abstract class Resource
         }
     }
 
-    public static function flutter(\Laravilt\Flutter\Flutter $flutter): \Laravilt\Flutter\Flutter
+    public static function flutter(Flutter $flutter): Flutter
     {
         return $flutter;
     }
@@ -346,7 +352,7 @@ abstract class Resource
             $model = new (static::getModel());
 
             return method_exists($model, $relationshipName) &&
-                   $model->{$relationshipName}() instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany;
+                   $model->{$relationshipName}() instanceof BelongsToMany;
         } catch (\Exception $e) {
             return false;
         }
@@ -543,14 +549,14 @@ abstract class Resource
         ];
 
         // Support both getUrl($panel) and getUrl('list', $parameters)
-        if ($panelOrPage instanceof \Laravilt\Panel\Panel) {
+        if ($panelOrPage instanceof Panel) {
             $panelId = $panelOrPage->getId();
             $page = $defaultListPage;
         } elseif ($panelOrPage === null) {
             $page = $defaultListPage;
         } else {
             // Get current panel from registry, no hardcoded fallback
-            $registry = app(\Laravilt\Panel\PanelRegistry::class);
+            $registry = app(PanelRegistry::class);
             $panel = $registry->getCurrent();
             $panelId = $panel?->getId();
 

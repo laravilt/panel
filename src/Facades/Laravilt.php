@@ -20,7 +20,7 @@ use Laravilt\Panel\TenantManager;
  * @method static bool isTenancyEnabled()
  * @method static string|null getTenantUrlSegment()
  *
- * @see \Laravilt\Panel\TenantManager
+ * @see TenantManager
  */
 class Laravilt extends Facade
 {

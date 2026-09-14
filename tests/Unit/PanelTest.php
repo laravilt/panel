@@ -1,5 +1,6 @@
 <?php
 
+use Laravilt\Panel\Pages\Dashboard;
 use Laravilt\Panel\Panel;
 
 describe('Panel', function () {
@@ -71,10 +72,10 @@ describe('Panel', function () {
 describe('Panel Pages', function () {
     it('can register pages', function () {
         $panel = Panel::make('admin')->pages([
-            \Laravilt\Panel\Pages\Dashboard::class,
+            Dashboard::class,
         ]);
 
-        expect($panel->getPages())->toContain(\Laravilt\Panel\Pages\Dashboard::class);
+        expect($panel->getPages())->toContain(Dashboard::class);
     });
 
     it('starts with empty pages', function () {

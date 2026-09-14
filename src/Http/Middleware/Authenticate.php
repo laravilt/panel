@@ -5,6 +5,7 @@ namespace Laravilt\Panel\Http\Middleware;
 use Illuminate\Auth\Middleware\Authenticate as Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Laravilt\Panel\Panel;
 use Laravilt\Panel\PanelRegistry;
 
 class Authenticate extends Middleware
@@ -42,7 +43,7 @@ class Authenticate extends Middleware
     /**
      * Try to detect the panel from the request URL path.
      */
-    protected function detectPanelFromRequest(Request $request): ?\Laravilt\Panel\Panel
+    protected function detectPanelFromRequest(Request $request): ?Panel
     {
         $registry = app(PanelRegistry::class);
         $path = trim($request->path(), '/');

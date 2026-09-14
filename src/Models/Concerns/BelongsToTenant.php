@@ -3,7 +3,10 @@
 namespace Laravilt\Panel\Models\Concerns;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 use Laravilt\Panel\Facades\Laravilt;
+use Laravilt\Panel\Facades\Panel;
+use Laravilt\Panel\Models\Tenant;
 use Laravilt\Panel\Tenancy\TenancyMode;
 
 /**
@@ -111,7 +114,7 @@ trait BelongsToTenant
     protected static function isMultiDatabaseMode(): bool
     {
         // First check if the current panel is in multi-database mode
-        $panel = \Laravilt\Panel\Facades\Panel::getCurrent();
+        $panel = Panel::getCurrent();
         if ($panel && $panel->isMultiDatabaseTenancy()) {
             return true;
         }
@@ -138,7 +141,7 @@ trait BelongsToTenant
         $instance = new static;
 
         return in_array('tenant_id', $instance->getFillable()) ||
-               \Illuminate\Support\Facades\Schema::hasColumn($instance->getTable(), 'tenant_id');
+               Schema::hasColumn($instance->getTable(), 'tenant_id');
     }
 
     /**
@@ -172,7 +175,7 @@ trait BelongsToTenant
             return;
         }
 
-        $tenantModel = config('laravilt-tenancy.models.tenant', \Laravilt\Panel\Models\Tenant::class);
+        $tenantModel = config('laravilt-tenancy.models.tenant', Tenant::class);
 
         return $this->belongsTo($tenantModel, 'tenant_id');
     }

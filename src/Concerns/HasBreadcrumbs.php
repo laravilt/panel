@@ -2,6 +2,8 @@
 
 namespace Laravilt\Panel\Concerns;
 
+use Laravilt\Panel\Pages\ListRecords;
+
 trait HasBreadcrumbs
 {
     /**
@@ -49,7 +51,7 @@ trait HasBreadcrumbs
             $resource = static::getResource();
             if ($resource) {
                 // Only add the list page breadcrumb if we're NOT on the list page itself
-                if (! ($this instanceof \Laravilt\Panel\Pages\ListRecords)) {
+                if (! ($this instanceof ListRecords)) {
                     $breadcrumbs[] = [
                         'label' => $resource::getPluralLabel() ?? $resource::getLabel(),
                         'url' => $resource::getUrl('list'),

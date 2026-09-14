@@ -102,7 +102,7 @@ abstract class Cluster
      */
     public function getPanel(): ?Panel
     {
-        $registry = app(\Laravilt\Panel\PanelRegistry::class);
+        $registry = app(PanelRegistry::class);
 
         foreach ($registry->all() as $panel) {
             if ($this->belongsToPanel($panel)) {

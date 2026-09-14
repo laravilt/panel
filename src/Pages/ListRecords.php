@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Pages;
 
 use Illuminate\Http\Request;
+use Laravilt\Actions\Action;
+use Laravilt\Actions\CreateAction;
 use Laravilt\Tables\Table;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 abstract class ListRecords extends Page
 {
@@ -17,7 +20,7 @@ abstract class ListRecords extends Page
     /**
      * Authorize access to this page.
      *
-     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     * @throws HttpException
      */
     protected function authorizeAccess(): void
     {
@@ -75,7 +78,7 @@ abstract class ListRecords extends Page
      * Define header actions for this page.
      * Override this method in your page class to customize actions.
      *
-     * @return array<\Laravilt\Actions\Action>
+     * @return array<Action>
      */
     protected function headerActions(): array
     {
@@ -100,12 +103,12 @@ abstract class ListRecords extends Page
 
             // Check if headerActions already has a CreateAction
             $hasCreateAction = collect($actions)->contains(function ($action) {
-                return $action instanceof \Laravilt\Actions\CreateAction;
+                return $action instanceof CreateAction;
             });
 
             if ($hasCreatePage && ! $hasCreateAction) {
                 // Add CreateAction that will auto-configure based on page context
-                array_unshift($actions, \Laravilt\Actions\CreateAction::make());
+                array_unshift($actions, CreateAction::make());
             }
         }
 

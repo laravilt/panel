@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Tenancy;
 
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Laravilt\Panel\Models\Tenant;
@@ -212,7 +213,7 @@ class MultiDatabaseManager
             '--force' => true,
         ], $options);
 
-        return \Illuminate\Support\Facades\Artisan::call('migrate', $options);
+        return Artisan::call('migrate', $options);
     }
 
     /**
@@ -231,7 +232,7 @@ class MultiDatabaseManager
             '--force' => true,
         ], $options);
 
-        return \Illuminate\Support\Facades\Artisan::call('migrate:rollback', $options);
+        return Artisan::call('migrate:rollback', $options);
     }
 
     /**
@@ -247,7 +248,7 @@ class MultiDatabaseManager
             return 0;
         }
 
-        return \Illuminate\Support\Facades\Artisan::call('db:seed', [
+        return Artisan::call('db:seed', [
             '--database' => 'tenant',
             '--class' => $seeder,
             '--force' => true,

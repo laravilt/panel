@@ -3,9 +3,11 @@
 namespace Laravilt\Panel\Http\Controllers;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 use Laravilt\Panel\Contracts\HasTenants;
 use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
@@ -145,7 +147,7 @@ class SelectOptionsController extends Controller
             if (method_exists($model, $name)) {
                 try {
                     $relation = $model->{$name}();
-                    if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                    if ($relation instanceof BelongsToMany) {
                         return true;
                     }
                 } catch (\Exception $e) {
@@ -443,7 +445,7 @@ class SelectOptionsController extends Controller
         }
 
         // Convert to array if needed
-        if ($allOptions instanceof \Illuminate\Support\Collection) {
+        if ($allOptions instanceof Collection) {
             $allOptions = $allOptions->all();
         }
 

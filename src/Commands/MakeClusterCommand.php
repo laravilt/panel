@@ -4,6 +4,7 @@ namespace Laravilt\Panel\Commands;
 
 use Illuminate\Console\GeneratorCommand;
 use Illuminate\Support\Str;
+use Symfony\Component\Console\Input\InputArgument;
 
 class MakeClusterCommand extends GeneratorCommand
 {
@@ -83,8 +84,8 @@ class MakeClusterCommand extends GeneratorCommand
     protected function getArguments(): array
     {
         return [
-            ['panel', \Symfony\Component\Console\Input\InputArgument::REQUIRED, 'The panel to create the cluster in'],
-            ['name', \Symfony\Component\Console\Input\InputArgument::REQUIRED, 'The name of the cluster'],
+            ['panel', InputArgument::REQUIRED, 'The panel to create the cluster in'],
+            ['name', InputArgument::REQUIRED, 'The name of the cluster'],
         ];
     }
 }

@@ -1,8 +1,15 @@
 <?php
 
+use Laravilt\Panel\Contracts\HasTenantAvatar;
+use Laravilt\Panel\Contracts\HasTenantName;
+use Laravilt\Panel\Middleware\IdentifyPanel;
+use Laravilt\Panel\Middleware\IdentifyTenant;
+use Laravilt\Panel\Middleware\InitializeTenancyBySubdomain;
 use Laravilt\Panel\Models\Domain;
 use Laravilt\Panel\Models\Tenant;
 use Laravilt\Panel\Panel;
+use Laravilt\Panel\Tenancy\ModelResolver;
+use Laravilt\Panel\Tenancy\MultiDatabaseManager;
 use Laravilt\Panel\Tenancy\TenancyMode;
 use Laravilt\Panel\TenantManager;
 
@@ -162,14 +169,14 @@ describe('Tenant Model Structure', function () {
         $tenant = new Tenant;
         $tenant->name = 'Test Company';
 
-        expect($tenant)->toBeInstanceOf(\Laravilt\Panel\Contracts\HasTenantName::class);
+        expect($tenant)->toBeInstanceOf(HasTenantName::class);
         expect($tenant->getTenantName())->toBe('Test Company');
     });
 
     it('implements HasTenantAvatar contract', function () {
         $tenant = new Tenant;
 
-        expect($tenant)->toBeInstanceOf(\Laravilt\Panel\Contracts\HasTenantAvatar::class);
+        expect($tenant)->toBeInstanceOf(HasTenantAvatar::class);
     });
 
     it('uses string primary key', function () {
@@ -411,39 +418,39 @@ describe('Tenant Ownership Relationship', function () {
 
 describe('Middleware Classes Exist', function () {
     it('InitializeTenancyBySubdomain middleware exists', function () {
-        expect(class_exists(\Laravilt\Panel\Middleware\InitializeTenancyBySubdomain::class))->toBeTrue();
+        expect(class_exists(InitializeTenancyBySubdomain::class))->toBeTrue();
     });
 
     it('IdentifyTenant middleware exists', function () {
-        expect(class_exists(\Laravilt\Panel\Middleware\IdentifyTenant::class))->toBeTrue();
+        expect(class_exists(IdentifyTenant::class))->toBeTrue();
     });
 
     it('IdentifyPanel middleware exists', function () {
-        expect(class_exists(\Laravilt\Panel\Middleware\IdentifyPanel::class))->toBeTrue();
+        expect(class_exists(IdentifyPanel::class))->toBeTrue();
     });
 });
 
 describe('Model Classes Exist', function () {
     it('Tenant model class exists', function () {
-        expect(class_exists(\Laravilt\Panel\Models\Tenant::class))->toBeTrue();
+        expect(class_exists(Tenant::class))->toBeTrue();
     });
 
     it('Domain model class exists', function () {
-        expect(class_exists(\Laravilt\Panel\Models\Domain::class))->toBeTrue();
+        expect(class_exists(Domain::class))->toBeTrue();
     });
 });
 
 describe('Tenancy Classes Exist', function () {
     it('TenancyMode enum exists', function () {
-        expect(class_exists(\Laravilt\Panel\Tenancy\TenancyMode::class))->toBeTrue();
+        expect(class_exists(TenancyMode::class))->toBeTrue();
     });
 
     it('MultiDatabaseManager class exists', function () {
-        expect(class_exists(\Laravilt\Panel\Tenancy\MultiDatabaseManager::class))->toBeTrue();
+        expect(class_exists(MultiDatabaseManager::class))->toBeTrue();
     });
 
     it('ModelResolver class exists', function () {
-        expect(class_exists(\Laravilt\Panel\Tenancy\ModelResolver::class))->toBeTrue();
+        expect(class_exists(ModelResolver::class))->toBeTrue();
     });
 });
 

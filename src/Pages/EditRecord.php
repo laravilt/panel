@@ -5,7 +5,16 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Pages;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Laravilt\Actions\Action;
+use Laravilt\Notifications\Notification;
+use Laravilt\Panel\Resources\RelationManagers\RelationManager;
 use Laravilt\Schemas\Schema;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 abstract class EditRecord extends Page
 {
@@ -74,7 +83,7 @@ abstract class EditRecord extends Page
      * Display the page (GET request handler).
      * Receives the record ID from route parameter and resolves the model.
      */
-    public function create(\Illuminate\Http\Request $request, ...$parameters)
+    public function create(Request $request, ...$parameters)
     {
         // Extract the record ID from the named route parameter
         // This handles both regular routes and subdomain routes where {tenant} is also a parameter
@@ -115,7 +124,7 @@ abstract class EditRecord extends Page
     /**
      * Authorize access to this page.
      *
-     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     * @throws HttpException
      */
     protected function authorizeAccess(): void
     {
@@ -363,7 +372,7 @@ abstract class EditRecord extends Page
         $disksToCheck = array_unique($disksToCheck);
 
         foreach ($disksToCheck as $checkDisk) {
-            $exists = \Illuminate\Support\Facades\Storage::disk($checkDisk)->exists($path);
+            $exists = Storage::disk($checkDisk)->exists($path);
 
             if ($exists) {
                 try {
@@ -377,7 +386,7 @@ abstract class EditRecord extends Page
                         ->toMediaCollection($collection);
 
                     // Delete the temporary upload after adding to media library
-                    \Illuminate\Support\Facades\Storage::disk($checkDisk)->delete($path);
+                    Storage::disk($checkDisk)->delete($path);
 
                     return;
                 } catch (\Throwable $e) {
@@ -448,11 +457,11 @@ abstract class EditRecord extends Page
                 $relation = $this->record->{$methodName}();
 
                 // Check if it's a BelongsToMany relationship - load IDs
-                if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                if ($relation instanceof BelongsToMany) {
                     $data[$methodName] = $this->record->{$methodName}()->pluck($relation->getRelated()->getTable().'.id')->toArray();
                 }
                 // Check if it's a HasMany relationship - load full records (for Repeaters)
-                elseif ($relation instanceof \Illuminate\Database\Eloquent\Relations\HasMany) {
+                elseif ($relation instanceof HasMany) {
                     $data[$methodName] = $this->record->{$methodName}()->get()->toArray();
                 }
             } catch (\Throwable $e) {
@@ -531,7 +540,7 @@ abstract class EditRecord extends Page
                 $relation = $this->record->{$methodName}();
 
                 // Check if it's a BelongsToMany relationship
-                if ($relation instanceof \Illuminate\Database\Eloquent\Relations\BelongsToMany) {
+                if ($relation instanceof BelongsToMany) {
                     $relationships[$methodName] = $data[$methodName];
                     unset($data[$methodName]);
                 }
@@ -571,13 +580,13 @@ abstract class EditRecord extends Page
      *
      * @param  array<string, mixed>  $data
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     protected function validateFormData(array $data): array
     {
         $resource = static::getResource();
         $modelClass = $resource::getModel();
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
+        $form = $this->form((new Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
 
         $rules = $form->getValidationRules();
         $messages = $form->getValidationMessages();
@@ -615,7 +624,7 @@ abstract class EditRecord extends Page
         $resource = static::getResource();
         $modelClass = $resource::getModel();
 
-        $form = $this->form((new \Laravilt\Schemas\Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
+        $form = $this->form((new Schema)->model($modelClass)->resourceSlug($resource::getSlug())->operation('edit'));
 
         // Fill with record data if available
         if (isset($this->record)) {
@@ -628,7 +637,7 @@ abstract class EditRecord extends Page
 
         // Add actions to the bottom of the form
         $actions = [
-            \Laravilt\Actions\Action::make('save')
+            Action::make('save')
                 ->label(__('laravilt-panel::panel.common.save'))
                 ->color('primary')
                 ->submit()
@@ -640,7 +649,7 @@ abstract class EditRecord extends Page
                     $this->save($validated);
                     $redirectUrl = $this->getRedirectUrl();
 
-                    \Laravilt\Notifications\Notification::success()
+                    Notification::success()
                         ->title(__('notifications::notifications.success'))
                         ->body(__('notifications::notifications.record_updated'))
                         ->send();
@@ -648,7 +657,7 @@ abstract class EditRecord extends Page
                     return redirect($redirectUrl);
                 }),
 
-            \Laravilt\Actions\Action::make('cancel')
+            Action::make('cancel')
                 ->label(__('laravilt-panel::panel.common.cancel'))
                 ->color('secondary')
                 ->outlined()
@@ -684,7 +693,7 @@ abstract class EditRecord extends Page
 
         return collect($relationManagers)
             ->map(function ($relationManagerClass) use ($resourceSlug) {
-                /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
+                /** @var RelationManager $manager */
                 $manager = $relationManagerClass::make($this->record);
 
                 if ($resourceSlug) {

@@ -1,5 +1,8 @@
 <?php
 
+use Laravilt\Panel\Models\Domain;
+use Laravilt\Panel\Models\Tenant;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -75,10 +78,10 @@ return [
 
     'models' => [
         // The tenant model class
-        'tenant' => \Laravilt\Panel\Models\Tenant::class,
+        'tenant' => Tenant::class,
 
         // The domain model class
-        'domain' => \Laravilt\Panel\Models\Domain::class,
+        'domain' => Domain::class,
 
         // Models that always use the central database
         // Add your User model and any shared models here

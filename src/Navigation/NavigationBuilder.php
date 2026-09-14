@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Navigation;
 
 use Closure;
+use Laravilt\Panel\Cluster;
 use Laravilt\Panel\Panel;
 
 class NavigationBuilder
@@ -123,7 +124,7 @@ class NavigationBuilder
         $navigationItems = collect($pages)
             ->filter(function ($page) {
                 // Skip clusters - they are added separately
-                if (is_subclass_of($page, \Laravilt\Panel\Cluster::class)) {
+                if (is_subclass_of($page, Cluster::class)) {
                     return false;
                 }
 

@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Discovery;
 
 use Laravilt\Panel\Panel;
+use Nwidart\Modules\Facades\Module;
 
 class PanelDiscovery
 {
@@ -75,11 +76,11 @@ class PanelDiscovery
     protected static function discoverFromModules(Panel $panel, string $panelId, string $studlyId): void
     {
         // Check if nwidart/laravel-modules is installed
-        if (! class_exists(\Nwidart\Modules\Facades\Module::class)) {
+        if (! class_exists(Module::class)) {
             return;
         }
 
-        $modules = \Nwidart\Modules\Facades\Module::allEnabled();
+        $modules = Module::allEnabled();
 
         foreach ($modules as $module) {
             $modulePath = $module->getPath();
@@ -150,8 +151,8 @@ class PanelDiscovery
         }
 
         // Module paths
-        if (class_exists(\Nwidart\Modules\Facades\Module::class)) {
-            $modules = \Nwidart\Modules\Facades\Module::allEnabled();
+        if (class_exists(Module::class)) {
+            $modules = Module::allEnabled();
 
             foreach ($modules as $module) {
                 $modulePath = $module->getPath();

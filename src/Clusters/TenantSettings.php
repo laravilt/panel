@@ -4,6 +4,7 @@ namespace Laravilt\Panel\Clusters;
 
 use Illuminate\Http\Request;
 use Laravilt\Panel\Cluster;
+use Laravilt\Panel\PanelRegistry;
 
 class TenantSettings extends Cluster
 {
@@ -37,7 +38,7 @@ class TenantSettings extends Cluster
      */
     public static function canAccess(): bool
     {
-        $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
+        $panel = app(PanelRegistry::class)->getCurrent();
 
         // Only check panel configuration, not tenant existence
         // Tenant existence is checked by the middleware
@@ -50,7 +51,7 @@ class TenantSettings extends Cluster
      */
     public function create(Request $request, ...$parameters)
     {
-        $panel = app(\Laravilt\Panel\PanelRegistry::class)->getCurrent();
+        $panel = app(PanelRegistry::class)->getCurrent();
 
         if (! $panel) {
             abort(404);

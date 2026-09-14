@@ -5,10 +5,17 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Concerns;
 
 use Closure;
+use Illuminate\Support\Facades\Route;
 use Laravilt\AI\AIManager;
 use Laravilt\AI\Builders\AIProviderBuilder;
 use Laravilt\AI\Builders\GlobalSearchBuilder;
 use Laravilt\AI\GlobalSearch;
+use Laravilt\AI\Http\Controllers\AIController;
+use Laravilt\AI\Http\Controllers\GlobalSearchController;
+use Laravilt\AI\Pages\AIChat;
+use Laravilt\Panel\Http\Middleware\HandleLocalization;
+use Laravilt\Panel\Http\Middleware\SharePanelData;
+use Laravilt\Panel\Middleware\IdentifyPanel;
 use Laravilt\Panel\Navigation\NavigationItem;
 
 trait HasAI
@@ -146,22 +153,22 @@ trait HasAI
         // Full middleware stack with panel identification, auth, localization and data sharing
         $fullMiddleware = array_merge(
             $middlewareWithoutAuth,
-            [\Laravilt\Panel\Middleware\IdentifyPanel::class.':'.$panelId],
+            [IdentifyPanel::class.':'.$panelId],
             $authMiddleware,
-            [\Laravilt\Panel\Http\Middleware\HandleLocalization::class],
-            [\Laravilt\Panel\Http\Middleware\SharePanelData::class]
+            [HandleLocalization::class],
+            [SharePanelData::class]
         );
 
         // Register global search route if enabled
         if ($this->hasGlobalSearch()) {
-            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
+            Route::middleware($fullMiddleware)
                 ->prefix($panelPath)
                 ->name($panelId.'.')
                 ->group(function () {
-                    $controller = \Laravilt\AI\Http\Controllers\GlobalSearchController::class;
+                    $controller = GlobalSearchController::class;
 
-                    \Illuminate\Support\Facades\Route::get('/global-search', [$controller, 'search'])->name('global-search');
-                    \Illuminate\Support\Facades\Route::get('/global-search/resources', [$controller, 'resources'])->name('global-search.resources');
+                    Route::get('/global-search', [$controller, 'search'])->name('global-search');
+                    Route::get('/global-search/resources', [$controller, 'resources'])->name('global-search.resources');
                 });
         }
 
@@ -170,13 +177,13 @@ trait HasAI
             $panel = $this;
 
             // Register AI Chat page route
-            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
+            Route::middleware($fullMiddleware)
                 ->prefix($panelPath)
                 ->name($panelId.'.')
                 ->group(function () use ($panel) {
-                    $pageClass = \Laravilt\AI\Pages\AIChat::class;
+                    $pageClass = AIChat::class;
 
-                    \Illuminate\Support\Facades\Route::get('/ai', function () use ($pageClass, $panel) {
+                    Route::get('/ai', function () use ($pageClass, $panel) {
                         $page = new $pageClass;
                         $page->panel($panel);
 
@@ -185,23 +192,23 @@ trait HasAI
                 });
 
             // Register AI API routes
-            \Illuminate\Support\Facades\Route::middleware($fullMiddleware)
+            Route::middleware($fullMiddleware)
                 ->prefix($panelPath.'/ai')
                 ->name($panelId.'.ai.')
                 ->group(function () {
-                    $controller = \Laravilt\AI\Http\Controllers\AIController::class;
+                    $controller = AIController::class;
 
-                    \Illuminate\Support\Facades\Route::get('/config', [$controller, 'config'])->name('config');
-                    \Illuminate\Support\Facades\Route::get('/resources', [$controller, 'resources'])->name('resources');
-                    \Illuminate\Support\Facades\Route::post('/chat', [$controller, 'chat'])->name('chat');
-                    \Illuminate\Support\Facades\Route::post('/stream', [$controller, 'stream'])->name('stream');
+                    Route::get('/config', [$controller, 'config'])->name('config');
+                    Route::get('/resources', [$controller, 'resources'])->name('resources');
+                    Route::post('/chat', [$controller, 'chat'])->name('chat');
+                    Route::post('/stream', [$controller, 'stream'])->name('stream');
 
                     // Session routes (methods in AIController)
-                    \Illuminate\Support\Facades\Route::get('/sessions', [$controller, 'sessions'])->name('sessions.index');
-                    \Illuminate\Support\Facades\Route::post('/sessions', [$controller, 'createSession'])->name('sessions.store');
-                    \Illuminate\Support\Facades\Route::get('/sessions/{session}', [$controller, 'session'])->name('sessions.show');
-                    \Illuminate\Support\Facades\Route::patch('/sessions/{session}', [$controller, 'updateSession'])->name('sessions.update');
-                    \Illuminate\Support\Facades\Route::delete('/sessions/{session}', [$controller, 'deleteSession'])->name('sessions.destroy');
+                    Route::get('/sessions', [$controller, 'sessions'])->name('sessions.index');
+                    Route::post('/sessions', [$controller, 'createSession'])->name('sessions.store');
+                    Route::get('/sessions/{session}', [$controller, 'session'])->name('sessions.show');
+                    Route::patch('/sessions/{session}', [$controller, 'updateSession'])->name('sessions.update');
+                    Route::delete('/sessions/{session}', [$controller, 'deleteSession'])->name('sessions.destroy');
                 });
         }
     }

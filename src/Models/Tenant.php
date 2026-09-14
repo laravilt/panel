@@ -2,11 +2,13 @@
 
 namespace Laravilt\Panel\Models;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravilt\Panel\Contracts\HasTenantAvatar;
 use Laravilt\Panel\Contracts\HasTenantName;
@@ -124,7 +126,7 @@ class Tenant extends Model implements HasTenantAvatar, HasTenantName
      */
     public function users(): BelongsToMany
     {
-        $userModel = config('auth.providers.users.model', \App\Models\User::class);
+        $userModel = config('auth.providers.users.model', User::class);
 
         return $this->belongsToMany($userModel, 'tenant_users', 'tenant_id', 'user_id')
             ->withPivot(['role', 'permissions', 'is_active', 'joined_at'])
@@ -136,7 +138,7 @@ class Tenant extends Model implements HasTenantAvatar, HasTenantName
      */
     public function owner(): BelongsTo
     {
-        $userModel = config('auth.providers.users.model', \App\Models\User::class);
+        $userModel = config('auth.providers.users.model', User::class);
 
         return $this->belongsTo($userModel, 'owner_id');
     }
@@ -297,7 +299,7 @@ class Tenant extends Model implements HasTenantAvatar, HasTenantName
     public function getTenantAvatarUrl(): ?string
     {
         if ($this->avatar) {
-            return \Illuminate\Support\Facades\Storage::disk('public')->url($this->avatar);
+            return Storage::disk('public')->url($this->avatar);
         }
 
         return null;

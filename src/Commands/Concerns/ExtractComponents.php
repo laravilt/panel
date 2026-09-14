@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Laravilt\Panel\Commands\Concerns;
 
+use Illuminate\Support\Str;
+
 /**
  * Methods for extracting form/table/infolist from resources.
  */
@@ -414,18 +416,18 @@ PHP;
 
         $relevantUses = [];
         foreach ($matches[1] as $use) {
-            $className = \Illuminate\Support\Str::afterLast($use, '\\');
+            $className = Str::afterLast($use, '\\');
             $alias = $className;
 
             // Check if there's an alias
-            if (\Illuminate\Support\Str::contains($use, ' as ')) {
+            if (Str::contains($use, ' as ')) {
                 [$use, $alias] = explode(' as ', $use);
                 $alias = trim($alias);
             }
 
             // Check if this class is used in the method body
-            if (\Illuminate\Support\Str::contains($methodBody, $alias)) {
-                $relevantUses[] = "use {$use}".(\Illuminate\Support\Str::contains($matches[0][array_search($use, $matches[1])], ' as ') ? " as {$alias}" : '').';';
+            if (Str::contains($methodBody, $alias)) {
+                $relevantUses[] = "use {$use}".(Str::contains($matches[0][array_search($use, $matches[1])], ' as ') ? " as {$alias}" : '').';';
             }
         }
 
@@ -467,7 +469,7 @@ PHP;
     {
         // Add use statement for the Form class
         $formUse = "use {$baseNamespace}\\Form\\{$resourceName}Form;";
-        if (! \Illuminate\Support\Str::contains($content, $formUse)) {
+        if (! Str::contains($content, $formUse)) {
             $content = preg_replace(
                 '/(namespace\s+[^;]+;\s*\n)/',
                 "$1\n{$formUse}\n",
@@ -501,7 +503,7 @@ PHP;
     {
         // Add use statement for the Table class
         $tableUse = "use {$baseNamespace}\\Table\\{$resourceName}Table;";
-        if (! \Illuminate\Support\Str::contains($content, $tableUse)) {
+        if (! Str::contains($content, $tableUse)) {
             $content = preg_replace(
                 '/(namespace\s+[^;]+;\s*\n)/',
                 "$1\n{$tableUse}\n",
@@ -535,7 +537,7 @@ PHP;
     {
         // Add use statement for the Infolist class
         $infolistUse = "use {$baseNamespace}\\Infolist\\{$resourceName}Infolist;";
-        if (! \Illuminate\Support\Str::contains($content, $infolistUse)) {
+        if (! Str::contains($content, $infolistUse)) {
             $content = preg_replace(
                 '/(namespace\s+[^;]+;\s*\n)/',
                 "$1\n{$infolistUse}\n",

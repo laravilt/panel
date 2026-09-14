@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Concerns;
 
 use Closure;
+use Illuminate\Support\Facades\Route;
+use Laravilt\Notifications\Http\Controllers\NotificationController;
 
 trait HasNotifications
 {
@@ -84,18 +86,18 @@ trait HasNotifications
         $panelPath = $this->getPath();
         $panelId = $this->getId();
 
-        \Illuminate\Support\Facades\Route::middleware($this->getMiddleware())
+        Route::middleware($this->getMiddleware())
             ->prefix($panelPath.'/notifications')
             ->name($panelId.'.notifications.')
             ->group(function () {
-                $controller = \Laravilt\Notifications\Http\Controllers\NotificationController::class;
+                $controller = NotificationController::class;
 
-                \Illuminate\Support\Facades\Route::get('/', [$controller, 'index'])->name('index');
-                \Illuminate\Support\Facades\Route::get('/unread', [$controller, 'unread'])->name('unread');
-                \Illuminate\Support\Facades\Route::post('/{id}/read', [$controller, 'markAsRead'])->name('mark-as-read');
-                \Illuminate\Support\Facades\Route::post('/read-all', [$controller, 'markAllAsRead'])->name('mark-all-as-read');
-                \Illuminate\Support\Facades\Route::delete('/{id}', [$controller, 'destroy'])->name('destroy');
-                \Illuminate\Support\Facades\Route::delete('/', [$controller, 'destroyAll'])->name('destroy-all');
+                Route::get('/', [$controller, 'index'])->name('index');
+                Route::get('/unread', [$controller, 'unread'])->name('unread');
+                Route::post('/{id}/read', [$controller, 'markAsRead'])->name('mark-as-read');
+                Route::post('/read-all', [$controller, 'markAllAsRead'])->name('mark-all-as-read');
+                Route::delete('/{id}', [$controller, 'destroy'])->name('destroy');
+                Route::delete('/', [$controller, 'destroyAll'])->name('destroy-all');
             });
     }
 }

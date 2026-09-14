@@ -3,6 +3,7 @@
 namespace Laravilt\Panel\Concerns;
 
 use Illuminate\Support\Facades\File;
+use Laravilt\Panel\Cluster;
 use ReflectionClass;
 use Symfony\Component\Finder\SplFileInfo;
 
@@ -74,7 +75,7 @@ trait HasClusters
                     }
 
                     // Check if it's a Cluster class
-                    if (! $reflection->isSubclassOf(\Laravilt\Panel\Cluster::class)) {
+                    if (! $reflection->isSubclassOf(Cluster::class)) {
                         return;
                     }
 

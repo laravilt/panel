@@ -2,6 +2,7 @@
 
 namespace Laravilt\Panel\Pages;
 
+use Inertia\Inertia;
 use Laravilt\Panel\Resources\Resource;
 use Laravilt\Widgets\Stat;
 use Laravilt\Widgets\StatsOverviewWidget;
@@ -221,7 +222,7 @@ class Dashboard extends Page
         $clusterClass = static::getCluster();
         $clusterNavigation = $this->getClusterNavigation();
 
-        return \Inertia\Inertia::render($component, [
+        return Inertia::render($component, [
             'title' => static::getTitle(),
             'breadcrumbs' => $this->getBreadcrumbs(),
             'headerWidgets' => $headerWidgets,

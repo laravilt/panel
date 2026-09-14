@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Laravilt\Panel\PanelRegistry;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
@@ -807,7 +808,7 @@ class MakeResourceCommand extends Command
     protected function getAvailablePanels(): array
     {
         // First try to get panels from the registry
-        $registry = app(\Laravilt\Panel\PanelRegistry::class);
+        $registry = app(PanelRegistry::class);
         $registeredPanels = $registry->all();
 
         if (! empty($registeredPanels)) {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Concerns;
 
 use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
 /**
  * Provides authorization methods for panel pages.
@@ -71,7 +72,7 @@ trait HasPageAuthorization
         if (method_exists($user, 'hasPermissionTo')) {
             try {
                 return $user->hasPermissionTo($permission, $guardName);
-            } catch (\Spatie\Permission\Exceptions\PermissionDoesNotExist $e) {
+            } catch (PermissionDoesNotExist $e) {
                 // Permission doesn't exist in the database - deny access
                 // Run `php artisan laravilt:secure` to generate permissions
                 return false;

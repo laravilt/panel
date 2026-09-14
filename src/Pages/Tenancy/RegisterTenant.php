@@ -13,6 +13,7 @@ use Laravilt\Panel\Facades\Laravilt;
 use Laravilt\Panel\Facades\Panel;
 use Laravilt\Panel\Models\Domain;
 use Laravilt\Panel\Pages\Page;
+use Laravilt\Panel\Tenancy\MultiDatabaseManager;
 use Laravilt\Schemas\Schema;
 use Laravilt\Support\Utilities\Get;
 use Laravilt\Support\Utilities\Set;
@@ -207,7 +208,7 @@ class RegisterTenant extends Page
         // For multi-database tenancy, create database, run migrations, and create domain record
         if ($panel->isMultiDatabaseTenancy()) {
             // Create the tenant database
-            $multiDbManager = app(\Laravilt\Panel\Tenancy\MultiDatabaseManager::class);
+            $multiDbManager = app(MultiDatabaseManager::class);
             $multiDbManager->createDatabase($tenant);
 
             // Run migrations on the tenant database

@@ -6,6 +6,8 @@ namespace Laravilt\Panel\Resources;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Laravilt\Panel\Panel;
+use Laravilt\Panel\PanelRegistry;
 
 /**
  * NestedResource - A resource that is nested within a parent resource.
@@ -223,14 +225,14 @@ abstract class NestedResource extends Resource
         ];
 
         // Support both getUrl($panel) and getUrl('list', $parameters)
-        if ($panelOrPage instanceof \Laravilt\Panel\Panel) {
+        if ($panelOrPage instanceof Panel) {
             $panelId = $panelOrPage->getId();
             $page = $defaultListPage;
         } elseif ($panelOrPage === null) {
             $page = $defaultListPage;
         } else {
             // Get current panel from registry
-            $registry = app(\Laravilt\Panel\PanelRegistry::class);
+            $registry = app(PanelRegistry::class);
             $panel = $registry->getCurrent();
             $panelId = $panel?->getId();
 

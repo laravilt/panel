@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Laravilt\Panel\Pages;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Laravilt\Panel\Resources\RelationManagers\RelationManager;
 use Laravilt\Schemas\Schema;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 abstract class ViewRecord extends Page
 {
@@ -74,7 +77,7 @@ abstract class ViewRecord extends Page
      * Display the page (GET request handler).
      * Receives the record ID from route parameter and resolves the model.
      */
-    public function create(\Illuminate\Http\Request $request, ...$parameters)
+    public function create(Request $request, ...$parameters)
     {
         // Extract the record ID from the named route parameter
         // This handles both regular routes and subdomain routes where {tenant} is also a parameter
@@ -106,7 +109,7 @@ abstract class ViewRecord extends Page
     /**
      * Authorize access to this page.
      *
-     * @throws \Symfony\Component\HttpKernel\Exception\HttpException
+     * @throws HttpException
      */
     protected function authorizeAccess(): void
     {
@@ -138,7 +141,7 @@ abstract class ViewRecord extends Page
     public function getSchema(): array
     {
         // Configure infolist
-        $infolist = $this->infolist(new \Laravilt\Schemas\Schema);
+        $infolist = $this->infolist(new Schema);
 
         // Fill with record data if available
         if (isset($this->record)) {
@@ -167,7 +170,7 @@ abstract class ViewRecord extends Page
 
         return collect($relationManagers)
             ->map(function ($relationManagerClass) {
-                /** @var \Laravilt\Panel\Resources\RelationManagers\RelationManager $manager */
+                /** @var RelationManager $manager */
                 $manager = $relationManagerClass::make($this->record);
 
                 return $manager->toArray();
