@@ -1,0 +1,2 @@
+// Localization lives in @laravilt/support; this module keeps the app-level import path working.
+export * from '@laravilt/support/composables/useLocalization';

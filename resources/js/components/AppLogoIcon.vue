@@ -15,11 +15,17 @@ defineProps<Props>();
 <template>
     <svg
         xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 263 306.97"
+        viewBox="0 0 100 100"
         :class="className"
         v-bind="$attrs"
     >
-        <polygon fill="#04bdaf" points="223 18.65 148 53.63 95 78.34 95 161.09 148 136.38 148 306.84 223 271.87 223 101.4 263 82.75 263 0 223 18.65"/>
-        <polygon fill="#822478" points="75 189.76 75 35 0 0 0 146.46 0 217.47 0 233.07 75 276.37 128 306.97 128 220.36 75 189.76"/>
+        <title>Laravilt</title>
+        <rect x="4" y="22.4" width="18.4" height="18.4" fill="#FF2D20"/>
+        <rect x="22.4" y="40.8" width="18.4" height="18.4" fill="#FF2D20"/>
+        <rect x="4" y="59.2" width="18.4" height="18.4" fill="#FF2D20"/>
+        <rect x="40.8" y="22.4" width="18.4" height="18.4" fill="#9553E9"/>
+        <rect x="40.8" y="59.2" width="18.4" height="18.4" fill="#9553E9"/>
+        <rect x="59.2" y="40.8" width="18.4" height="18.4" fill="#9553E9"/>
+        <rect x="77.6" y="22.4" width="18.4" height="18.4" fill="#9553E9"/>
     </svg>
 </template>

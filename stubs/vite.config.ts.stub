@@ -26,6 +26,8 @@ export default defineConfig({
         }),
     ],
     resolve: {
+        // Resolve dependencies from the app when packages are symlinked (composer path repositories)
+        preserveSymlinks: true,
         alias: {
             '@': resolve(__dirname, 'resources/js'),
             '@laravilt/panel': resolve(__dirname, 'vendor/laravilt/panel/resources/js'),

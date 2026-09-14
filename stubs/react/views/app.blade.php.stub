@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="{{ $locale ?? str_replace('_', '-', app()->getLocale()) }}" dir="{{ $direction ?? 'ltr' }}" @class(['dark' => ($appearance ?? 'system') == 'dark'])>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
+
+        {{-- Inline script to detect system dark mode preference and apply it immediately --}}
+        {{-- Also handle locale and direction from page props --}}
+        <script>
+            (function() {
+                const appearance = '{{ $appearance ?? "system" }}';
+
+                if (appearance === 'system') {
+                    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+                    if (prefersDark) {
+                        document.documentElement.classList.add('dark');
+                    }
+                }
+
+                // Handle locale and direction from Inertia page props
+                // This will be updated by React after hydration
+                window.addEventListener('DOMContentLoaded', function() {
+                    // Check if Inertia page data has localization info
+                    const pageScript = document.querySelector('script[data-page="app"][type="application/json"]');
+                    const pageData = pageScript ? pageScript.textContent : document.getElementById('app')?.dataset?.page;
+                    if (pageData) {
+                        try {
+                            const props = JSON.parse(pageData);
+                            if (props.props?.localization) {
+                                const { locale, direction } = props.props.localization;
+                                if (locale) document.documentElement.lang = locale;
+                                if (direction) document.documentElement.dir = direction;
+                            }
+                        } catch (e) {}
+                    }
+                });
+            })();
+        </script>
+
+        {{-- Inline style to set the HTML background color based on our theme in app.css --}}
+        <style>
+            html {
+                background-color: hsl(0 0% 100%);
+            }
+
+            html.dark {
+                background-color: hsl(0 0% 3.9%);
+            }
+        </style>
+
+        <link rel="icon" href="/favicon.ico" sizes="any">
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+        @fonts
+
+        @viteReactRefresh
+        {{-- No per-page entry: Laravilt pages are resolved from vendor/laravilt/*/resources/react --}}
+        @vite(['resources/css/app.css', 'resources/js/app.tsx'])
+        <x-inertia::head>
+            <title>{{ config('app.name', 'Laravel') }}</title>
+        </x-inertia::head>
+    </head>
+    <body class="font-sans antialiased">
+        <x-inertia::app />
+    </body>
+</html>

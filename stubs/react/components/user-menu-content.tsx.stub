@@ -1,0 +1,183 @@
+import { Link, router, usePage } from '@inertiajs/react';
+import { useLocalization } from '@laravilt/support/composables/useLocalization';
+import { resolveIcon } from '@laravilt/support/lib/icons';
+import { Check, Monitor, Moon, Palette, Sun } from 'lucide-react';
+import { Fragment } from 'react';
+import {
+    DropdownMenuGroup,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+} from '@/components/ui/dropdown-menu';
+import { UserInfo } from '@/components/user-info';
+import { useAppearance } from '@/hooks/use-appearance';
+import { useMobileNavigation } from '@/hooks/use-mobile-navigation';
+import type { MenuItem, User } from '@/types';
+
+type Props = {
+    user: User;
+};
+
+// Map Heroicons names to Lucide equivalents
+const iconNameMap: Record<string, string> = {
+    'cog-6-tooth': 'Settings',
+    'arrow-right-on-rectangle': 'LogOut',
+    user: 'User',
+    'shield-check': 'ShieldCheck',
+};
+
+const getIconComponent = (iconName?: string | null) => {
+    if (!iconName) {
+        return null;
+    }
+
+    return resolveIcon(iconNameMap[iconName] ?? iconName);
+};
+
+export function UserMenuContent({ user }: Props) {
+    const { trans } = useLocalization();
+    const { panel } = usePage().props;
+    const cleanup = useMobileNavigation();
+    const { appearance, updateAppearance } = useAppearance();
+
+    const userMenuItems: MenuItem[] = panel?.userMenu || [];
+
+    const appearanceOptions = [
+        {
+            value: 'light' as const,
+            Icon: Sun,
+            label: trans('laravilt-panel::panel.appearance.light'),
+        },
+        {
+            value: 'dark' as const,
+            Icon: Moon,
+            label: trans('laravilt-panel::panel.appearance.dark'),
+        },
+        {
+            value: 'system' as const,
+            Icon: Monitor,
+            label: trans('laravilt-panel::panel.appearance.system'),
+        },
+    ];
+
+    const handleMenuItemClick = (item: MenuItem) => {
+        if (!item.url) {
+            return;
+        }
+
+        if (item.method === 'post') {
+            cleanup();
+            router.post(
+                item.url,
+                {},
+                {
+                    onFinish: () => router.flushAll(),
+                },
+            );
+        }
+    };
+
+    return (
+        <>
+            <DropdownMenuLabel className="p-0 font-normal">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm rtl:flex-row-reverse">
+                    <UserInfo user={user} showEmail={true} />
+                </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+
+            {/* Appearance submenu */}
+            <DropdownMenuGroup>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="rtl:flex-row-reverse">
+                        <Palette className="h-4 w-4" />
+                        {trans('laravilt-panel::panel.appearance.title')}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        {appearanceOptions.map((option) => (
+                            <DropdownMenuItem
+                                key={option.value}
+                                onClick={() => updateAppearance(option.value)}
+                                className="gap-2 rtl:flex-row-reverse"
+                            >
+                                <option.Icon className="h-4 w-4" />
+                                {option.label}
+                                {appearance === option.value && (
+                                    <Check className="ms-auto h-4 w-4" />
+                                )}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+
+            {userMenuItems.map((item, index) => {
+                const ItemIcon = getIconComponent(item.icon);
+                const label = item.translationKey
+                    ? trans(item.translationKey)
+                    : item.title;
+
+                return (
+                    <Fragment key={index}>
+                        {item.type === 'item' && (
+                            <DropdownMenuGroup>
+                                {item.method === 'post' ? (
+                                    <DropdownMenuItem
+                                        asChild
+                                        className="rtl:flex-row-reverse"
+                                    >
+                                        <button
+                                            className="w-full"
+                                            onClick={() =>
+                                                handleMenuItemClick(item)
+                                            }
+                                            data-test={
+                                                item.title
+                                                    ? item.title
+                                                          .toLowerCase()
+                                                          .replace(/\s+/g, '-') +
+                                                      '-button'
+                                                    : ''
+                                            }
+                                        >
+                                            {ItemIcon && (
+                                                <ItemIcon className="h-4 w-4" />
+                                            )}
+                                            {label}
+                                        </button>
+                                    </DropdownMenuItem>
+                                ) : (
+                                    <DropdownMenuItem
+                                        asChild
+                                        className="rtl:flex-row-reverse"
+                                    >
+                                        <Link
+                                            className="block w-full"
+                                            href={item.url || '#'}
+                                            prefetch
+                                            as="button"
+                                            onClick={cleanup}
+                                        >
+                                            {ItemIcon && (
+                                                <ItemIcon className="h-4 w-4" />
+                                            )}
+                                            {label}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                )}
+                            </DropdownMenuGroup>
+                        )}
+
+                        {index < userMenuItems.length - 1 && (
+                            <DropdownMenuSeparator />
+                        )}
+                    </Fragment>
+                );
+            })}
+        </>
+    );
+}

@@ -1,0 +1,30 @@
+import type { Auth } from '@/types/auth';
+import type { Panel } from '@/types/panel';
+
+declare module 'react' {
+    interface InputHTMLAttributes<T> {
+        passwordrules?: string;
+    }
+}
+
+declare module '@inertiajs/core' {
+    export interface InertiaConfig {
+        sharedPageProps: {
+            name: string;
+            auth: Auth;
+            sidebarOpen: boolean;
+            quote?: { message: string; author: string };
+            notifications?: any[];
+            actionUpdatedData?: unknown;
+            panel?: Panel;
+            localization?: {
+                locale: string;
+                timezone: string;
+                direction: 'ltr' | 'rtl';
+                isRtl: boolean;
+            };
+            translations?: Record<string, unknown>;
+            [key: string]: unknown;
+        };
+    }
+}

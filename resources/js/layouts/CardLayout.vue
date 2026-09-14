@@ -48,51 +48,56 @@ watchEffect(() => {
 
 <template>
     <div
-        class="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10"
+        class="isolate flex min-h-svh max-w-screen flex-col overflow-x-clip bg-background"
         :style="font?.family ? { fontFamily: `'${font.family}', sans-serif` } : {}"
     >
-        <div class="w-full max-w-sm">
-            <div class="flex flex-col gap-6">
-                <!-- Logo -->
-                <div class="flex flex-col items-center gap-3">
-                    <a
-                        :href="homeUrl"
-                        class="flex flex-col items-center gap-2 font-medium"
-                    >
-                        <div
-                            class="flex items-center justify-center"
-                        >
-                            <!-- Use panel brand logo if available -->
-                            <img
-                                v-if="brandLogo"
-                                :src="brandLogo"
-                                :alt="brandName || title"
-                                class="h-9 w-auto max-w-[200px] object-contain"
-                            />
-                            <!-- Fallback to AppLogoIcon -->
-                            <AppLogoIcon
-                                v-else
-                                class="size-9 fill-current text-[var(--foreground)] dark:text-white"
-                            />
-                        </div>
-                        <span class="sr-only">{{ brandName || title }}</span>
-                    </a>
-
-                    <!-- Title and Description -->
-                    <div class="space-y-1 text-center">
-                        <h1 class="text-xl font-medium">{{ title }}</h1>
-                        <p
-                            v-if="description"
-                            class="text-center text-sm text-muted-foreground"
-                        >
-                            {{ description }}
-                        </p>
+        <div
+            class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center border-x border-line"
+        >
+            <!-- Logo -->
+            <div
+                class="screen-line-top screen-line-bottom flex items-center justify-center py-5"
+            >
+                <a
+                    :href="homeUrl"
+                    class="flex flex-col items-center gap-2 font-medium"
+                >
+                    <div class="flex items-center justify-center">
+                        <!-- Use panel brand logo if available -->
+                        <img
+                            v-if="brandLogo"
+                            :src="brandLogo"
+                            :alt="brandName || title"
+                            class="h-10 w-auto max-w-[200px] object-contain"
+                        />
+                        <!-- Fallback to AppLogoIcon -->
+                        <AppLogoIcon v-else class="size-10" />
                     </div>
-                </div>
+                    <span class="sr-only">{{ brandName || title }}</span>
+                </a>
+            </div>
 
-                <!-- Content -->
+            <div class="stripe-divider" />
+
+            <!-- Title and Description -->
+            <div
+                class="screen-line-top screen-line-bottom flex flex-col gap-1 px-6 pt-8 pb-6 text-center md:px-10"
+            >
+                <h1 class="text-xl font-medium">{{ title }}</h1>
+                <p
+                    v-if="description"
+                    class="text-center text-sm text-muted-foreground"
+                >
+                    {{ description }}
+                </p>
+            </div>
+
+            <!-- Content -->
+            <div class="screen-line-bottom px-6 py-8 md:px-10">
                 <slot />
             </div>
+
+            <div class="stripe-divider" />
         </div>
         <NotificationContainer />
     </div>

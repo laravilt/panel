@@ -1,0 +1,393 @@
+import { Link, usePage } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    SidebarGroup,
+    SidebarMenu,
+    SidebarMenuBadge,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarMenuSub,
+    SidebarMenuSubButton,
+    SidebarMenuSubItem,
+    useSidebar,
+} from '@/components/ui/sidebar';
+import { cn, urlIsActive } from '@/lib/utils';
+import type { NavItem } from '@/types';
+
+const GROUPS_STATE_KEY = 'navigation-groups-state';
+
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'outline';
+
+/**
+ * Semantic badge colours. The shadcn/ui badge only ships default/secondary/destructive/outline,
+ * so the extra Laravilt variants are applied as classes (same classes as the Vue badge variants).
+ */
+const semanticBadgeClasses: Record<string, string> = {
+    primary: 'border-transparent bg-blue-500 text-white [a&]:hover:bg-blue-600',
+    success:
+        'border-transparent bg-emerald-500 text-white [a&]:hover:bg-emerald-600',
+    danger: 'border-transparent bg-red-500 text-white [a&]:hover:bg-red-600',
+    warning:
+        'border-transparent bg-amber-500 text-white [a&]:hover:bg-amber-600',
+    info: 'border-transparent bg-sky-500 text-white [a&]:hover:bg-sky-600',
+    gray: 'border-transparent bg-gray-500 text-white [a&]:hover:bg-gray-600',
+};
+
+// Get badge variant based on color
+function getBadgeVariant(color?: string | null): string {
+    switch (color) {
+        case 'primary':
+            return 'primary';
+        case 'success':
+        case 'green':
+            return 'success';
+        case 'danger':
+        case 'red':
+            return 'danger';
+        case 'warning':
+        case 'yellow':
+        case 'orange':
+            return 'warning';
+        case 'info':
+        case 'blue':
+            return 'info';
+        case 'secondary':
+            return 'secondary';
+        case 'gray':
+            return 'gray';
+        case 'outline':
+            return 'outline';
+        case 'destructive':
+            return 'destructive';
+        default:
+            return 'default';
+    }
+}
+
+function badgeProps(
+    color: string | null | undefined,
+    className: string,
+): { variant: BadgeVariant; className: string } {
+    const variant = getBadgeVariant(color);
+    const semantic = semanticBadgeClasses[variant];
+
+    if (semantic) {
+        return { variant: 'default', className: cn(semantic, className) };
+    }
+
+    return { variant: variant as BadgeVariant, className };
+}
+
+// Extract path from URL (handles both full URLs and relative paths)
+function extractPath(url: string): string {
+    if (!url) {
+        return '';
+    }
+
+    try {
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+            return new URL(url).pathname;
+        }
+
+        // Remove query string and hash
+        return url.split('?')[0].split('#')[0];
+    } catch {
+        return url;
+    }
+}
+
+export function NavMain({ items }: { items: NavItem[] }) {
+    const page = usePage();
+    const currentUrl = page.url;
+
+    // Get sidebar state to determine if collapsed to icon mode
+    const { state: sidebarState } = useSidebar();
+    const isCollapsed = sidebarState === 'collapsed';
+
+    // Track open state for each group
+    const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+
+    // Track which groups should animate (only after user click)
+    const [animatingGroups, setAnimatingGroups] = useState<Set<string>>(
+        () => new Set(),
+    );
+
+    // Check if a nav item is active (regular URL matching plus prefix matching for clusters)
+    const isNavItemActive = (item: NavItem): boolean => {
+        const currentPath = extractPath(currentUrl);
+
+        // First check activeMatchPrefix for cluster-style matching
+        if (item.activeMatchPrefix) {
+            const prefix = extractPath(item.activeMatchPrefix).replace(
+                /\/$/,
+                '',
+            );
+            const normalizedCurrent = currentPath.replace(/\/$/, '');
+
+            if (
+                normalizedCurrent.startsWith(prefix) &&
+                (normalizedCurrent[prefix.length] === '/' ||
+                    normalizedCurrent.length === prefix.length)
+            ) {
+                return true;
+            }
+        }
+
+        // Fall back to regular URL matching
+        return urlIsActive(item.url || item.href, currentUrl);
+    };
+
+    // Load saved group states from localStorage, defaulting unsaved groups to !collapsed
+    useEffect(() => {
+        let saved: Record<string, boolean> = {};
+        const raw = localStorage.getItem(GROUPS_STATE_KEY);
+
+        if (raw) {
+            try {
+                saved = JSON.parse(raw);
+            } catch {
+                // Ignore parse errors
+            }
+        }
+
+        const next = { ...saved };
+
+        items.forEach((item) => {
+            if (item.type === 'group' && !(item.title in next)) {
+                next[item.title] = !item.collapsed;
+            }
+        });
+
+        setOpenGroups(next);
+    }, [items]);
+
+    // Toggle group with animation (only called on user click)
+    const toggleGroup = (title: string, isOpen: boolean) => {
+        // Mark this group for animation BEFORE the state change
+        setAnimatingGroups((previous) => new Set(previous).add(title));
+
+        // Apply the open state once data-animating is on the DOM
+        window.setTimeout(() => {
+            setOpenGroups((previous) => {
+                const next = { ...previous, [title]: isOpen };
+                localStorage.setItem(GROUPS_STATE_KEY, JSON.stringify(next));
+
+                return next;
+            });
+
+            // Remove animation flag after animation completes
+            window.setTimeout(() => {
+                setAnimatingGroups((previous) => {
+                    const next = new Set(previous);
+                    next.delete(title);
+
+                    return next;
+                });
+            }, 250);
+        }, 0);
+    };
+
+    return (
+        <SidebarGroup className="px-2 py-0">
+            <SidebarMenu className="mt-6">
+                {items.map((item) => {
+                    const isGroup =
+                        item.type === 'group' &&
+                        !!item.items &&
+                        item.items.length > 0;
+
+                    // Navigation group with nested items - dropdown mode when collapsed
+                    if (isGroup && isCollapsed) {
+                        return (
+                            <SidebarMenuItem key={item.title}>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <SidebarMenuButton tooltip={item.title}>
+                                            {item.icon && <item.icon />}
+                                            <span>{item.title}</span>
+                                            <ChevronRight className="ms-auto transition-transform duration-200 rtl:-rotate-180" />
+                                        </SidebarMenuButton>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        side="right"
+                                        align="start"
+                                        sideOffset={8}
+                                        className="min-w-56"
+                                    >
+                                        {item.items!.map((subItem) => {
+                                            const badge = badgeProps(
+                                                subItem.badgeColor,
+                                                'ml-auto me-1 h-5 min-w-5 px-1.5 text-xs',
+                                            );
+
+                                            return (
+                                                <DropdownMenuItem
+                                                    key={subItem.title}
+                                                    asChild
+                                                >
+                                                    <Link
+                                                        href={subItem.url ?? subItem.href}
+                                                        className={cn(
+                                                            'flex w-full cursor-pointer items-center justify-between',
+                                                            urlIsActive(
+                                                                subItem.url ?? subItem.href,
+                                                                currentUrl,
+                                                            )
+                                                                ? 'bg-accent'
+                                                                : '',
+                                                        )}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            {subItem.icon && (
+                                                                <subItem.icon className="size-4" />
+                                                            )}
+                                                            <span>
+                                                                {subItem.title}
+                                                            </span>
+                                                        </span>
+                                                        {(subItem.badge ||
+                                                            subItem.badgeCount) && (
+                                                            <Badge
+                                                                variant={badge.variant}
+                                                                className={badge.className}
+                                                            >
+                                                                {subItem.badge ||
+                                                                    subItem.badgeCount}
+                                                            </Badge>
+                                                        )}
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            );
+                                        })}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </SidebarMenuItem>
+                        );
+                    }
+
+                    // Navigation group with nested items - collapsible mode when expanded
+                    if (isGroup) {
+                        return (
+                            <Collapsible
+                                key={item.title}
+                                asChild
+                                open={openGroups[item.title] ?? false}
+                                onOpenChange={(isOpen) =>
+                                    toggleGroup(item.title, isOpen)
+                                }
+                                className="group/collapsible"
+                                data-animating={
+                                    animatingGroups.has(item.title)
+                                        ? 'true'
+                                        : undefined
+                                }
+                            >
+                                <SidebarMenuItem>
+                                    <CollapsibleTrigger asChild>
+                                        <SidebarMenuButton tooltip={item.title}>
+                                            {item.icon && <item.icon />}
+                                            <span>{item.title}</span>
+                                            <ChevronRight className="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 rtl:-rotate-180 rtl:group-data-[state=open]/collapsible:-rotate-90" />
+                                        </SidebarMenuButton>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <SidebarMenuSub>
+                                            {item.items!.map((subItem) => {
+                                                const badge = badgeProps(
+                                                    subItem.badgeColor,
+                                                    'ml-auto me-1 h-5 min-w-5 px-1.5 text-xs',
+                                                );
+
+                                                return (
+                                                    <SidebarMenuSubItem
+                                                        key={subItem.title}
+                                                    >
+                                                        <SidebarMenuSubButton
+                                                            asChild
+                                                            isActive={urlIsActive(
+                                                                subItem.url ?? subItem.href,
+                                                                currentUrl,
+                                                            )}
+                                                        >
+                                                            <Link
+                                                                href={subItem.url ?? subItem.href}
+                                                                className="flex w-full items-center justify-between"
+                                                            >
+                                                                <span className="flex items-center gap-2">
+                                                                    {subItem.icon && (
+                                                                        <subItem.icon className="size-3.5" />
+                                                                    )}
+                                                                    <span>
+                                                                        {subItem.title}
+                                                                    </span>
+                                                                </span>
+                                                                {(subItem.badge ||
+                                                                    subItem.badgeCount) && (
+                                                                    <Badge
+                                                                        variant={badge.variant}
+                                                                        className={badge.className}
+                                                                    >
+                                                                        {subItem.badge ||
+                                                                            subItem.badgeCount}
+                                                                    </Badge>
+                                                                )}
+                                                            </Link>
+                                                        </SidebarMenuSubButton>
+                                                    </SidebarMenuSubItem>
+                                                );
+                                            })}
+                                        </SidebarMenuSub>
+                                    </CollapsibleContent>
+                                </SidebarMenuItem>
+                            </Collapsible>
+                        );
+                    }
+
+                    // Regular navigation item
+                    const badge = badgeProps(
+                        item.badgeColor,
+                        'h-5 min-w-5 px-1.5 text-xs',
+                    );
+
+                    return (
+                        <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isNavItemActive(item)}
+                                tooltip={item.title}
+                            >
+                                <Link href={item.url || item.href}>
+                                    {item.icon && <item.icon />}
+                                    <span>{item.title}</span>
+                                </Link>
+                            </SidebarMenuButton>
+                            {(item.badge || item.badgeCount) && (
+                                <SidebarMenuBadge>
+                                    <Badge
+                                        variant={badge.variant}
+                                        className={badge.className}
+                                    >
+                                        {item.badge || item.badgeCount}
+                                    </Badge>
+                                </SidebarMenuBadge>
+                            )}
+                        </SidebarMenuItem>
+                    );
+                })}
+            </SidebarMenu>
+        </SidebarGroup>
+    );
+}

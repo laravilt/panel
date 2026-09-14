@@ -1,0 +1,69 @@
+import { usePage } from '@inertiajs/react';
+import {
+    NotificationContainer,
+    useNotification,
+} from '@laravilt/notifications/app';
+import { useEffect, useRef } from 'react';
+import { AppContent } from '@/components/app-content';
+import { AppShell } from '@/components/app-shell';
+import { AppSidebar } from '@/components/app-sidebar';
+import { AppSidebarHeader } from '@/components/app-sidebar-header';
+import type { AppLayoutProps } from '@/types';
+
+export default function AppSidebarLayout({
+    children,
+    breadcrumbs = [],
+}: AppLayoutProps) {
+    const { notifications } = usePage().props;
+    const { notify: showNotification } = useNotification();
+    const displayed = useRef<unknown>(null);
+
+    // Display session notifications on mount and whenever page props change (Inertia visits)
+    useEffect(() => {
+        // Guard against StrictMode's double effect run showing the same flash twice
+        if (displayed.current === notifications) {
+            return;
+        }
+
+        displayed.current = notifications;
+
+        if (!Array.isArray(notifications)) {
+            return;
+        }
+
+        notifications.forEach((notification: any) => {
+            // Support both old format (message) and new format (title/body)
+            if (notification.title || notification.body) {
+                showNotification(
+                    notification.title || '',
+                    notification.body,
+                    notification.type,
+                    {
+                        icon: notification.icon,
+                        color: notification.color,
+                        actions: notification.actions,
+                        duration: notification.duration,
+                    },
+                );
+            } else {
+                // Backward compatibility: just message
+                showNotification(
+                    notification.message,
+                    undefined,
+                    notification.type,
+                );
+            }
+        });
+    }, [notifications, showNotification]);
+
+    return (
+        <AppShell variant="sidebar">
+            <AppSidebar />
+            <AppContent variant="sidebar" className="min-w-0 overflow-x-clip">
+                <AppSidebarHeader breadcrumbs={breadcrumbs} />
+                {children}
+            </AppContent>
+            <NotificationContainer />
+        </AppShell>
+    );
+}

@@ -5,6 +5,7 @@ namespace Laravilt\Panel\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Laravilt\Support\Frontend;
 
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
@@ -89,8 +90,12 @@ class MakePageCommand extends Command
         // Create PHP page class
         $this->createPageClass($panel, $name);
 
-        // Create Vue view file
-        $this->createVueViewFile($panel, $name);
+        // Create the view file for the application's frontend stack
+        $react = Frontend::isReact();
+
+        $react
+            ? $this->createReactViewFile($panel, $name)
+            : $this->createVueViewFile($panel, $name);
 
         $this->newLine();
         $this->components->info("Page [{$name}] created successfully for panel [{$panel}]!");
@@ -99,7 +104,9 @@ class MakePageCommand extends Command
         $slug = Str::kebab($name);
         $this->components->bulletList([
             "PHP Class: app/Laravilt/{$panel}/Pages/{$name}.php",
-            "Vue View: resources/js/pages/{$panel}/{$name}.vue",
+            $react
+                ? "React View: resources/js/pages/{$panel}/{$name}.tsx"
+                : "Vue View: resources/js/pages/{$panel}/{$name}.vue",
             "URL: /{$slug}",
         ]);
 
@@ -316,6 +323,115 @@ PHP;
         File::put($viewFile, $content);
 
         $this->components->task('Creating Vue view', fn () => true);
+    }
+
+    /**
+     * Create the React view file.
+     */
+    protected function createReactViewFile(string $panel, string $name): void
+    {
+        $viewPath = resource_path("js/pages/{$panel}");
+        $viewFile = "{$viewPath}/{$name}.tsx";
+
+        if (File::exists($viewFile)) {
+            $this->components->warn("React view already exists: {$viewFile}");
+
+            return;
+        }
+
+        File::ensureDirectoryExists($viewPath);
+
+        File::put($viewFile, $this->generateReactView($name));
+
+        $this->components->task('Creating React view', fn () => true);
+    }
+
+    /**
+     * Generate React view content. The app's Inertia layout resolver wraps it in AppLayout.
+     */
+    protected function generateReactView(string $name): string
+    {
+        $title = Str::title(Str::snake($name, ' '));
+
+        [$imports, $body] = match ($this->pageType) {
+            'dashboard' => [
+                '',
+                <<<'TSX'
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                    {/* Add widget components here */}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                    {/* Add chart components here */}
+                </div>
+TSX,
+            ],
+            'form' => [
+                "import { Button } from '@/components/ui/button';\nimport { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';\n",
+                <<<TSX
+                <Card>
+                    <CardHeader>
+                        <CardTitle>{$title}</CardTitle>
+                        <CardDescription>
+                            Configure your {$name} settings.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form className="space-y-4">
+                            {/* Add form fields here */}
+
+                            <div className="flex justify-end">
+                                <Button type="submit">Save Changes</Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+TSX,
+            ],
+            'table' => [
+                "import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';\n",
+                <<<'TSX'
+                <Card>
+                    <CardHeader>
+                        <CardTitle>All Records</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {/* Add table component here */}
+                    </CardContent>
+                </Card>
+TSX,
+            ],
+            default => [
+                '',
+                <<<TSX
+                <div className="rounded-lg border p-6">
+                    <p className="text-muted-foreground">
+                        This is the {$name} page. Add your content here.
+                    </p>
+                </div>
+TSX,
+            ],
+        };
+
+        return <<<TSX
+import { Head } from '@inertiajs/react';
+import Heading from '@/components/heading';
+{$imports}
+export default function {$name}() {
+    return (
+        <>
+            <Head title="{$title}" />
+
+            <div className="space-y-6 p-4">
+                <Heading title="{$title}" />
+
+{$body}
+            </div>
+        </>
+    );
+}
+
+TSX;
     }
 
     /**
