@@ -12,6 +12,7 @@ use Laravilt\Panel\Panel;
 use Laravilt\Panel\PanelServiceProvider;
 use Laravilt\Panel\Resources\RelationManagers\RelationManager;
 use Laravilt\Panel\Resources\Resource;
+use Laravilt\Tables\Columns\Contracts\EditableColumn;
 use Laravilt\Tables\Columns\SelectColumn;
 use Laravilt\Tables\Columns\TextColumn;
 use Laravilt\Tables\Columns\ToggleColumn;
@@ -230,7 +231,7 @@ describe('resource column route', function () {
             ->assertOk();
 
         expect($this->post->fresh()->status)->toBe('live');
-    });
+    })->skip(fn () => ! interface_exists(EditableColumn::class), 'requires laravilt/tables with EditableColumn');
 
     it('only writes the column attribute', function () {
         $this->patchJson('/admin/posts/'.$this->post->id.'/column', ['column' => 'is_published', 'value' => 1, 'is_admin' => 1, 'title' => 'x'])
