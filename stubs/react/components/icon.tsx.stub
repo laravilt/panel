@@ -1,0 +1,40 @@
+import { resolveIcon } from '@laravilt/support/lib/icons';
+import type { LucideProps } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type Props = Omit<LucideProps, 'ref'> & {
+    name: string;
+    className?: string;
+    size?: number | string;
+    color?: string;
+    strokeWidth?: number | string;
+};
+
+export function Icon({
+    name,
+    className = '',
+    size = 16,
+    strokeWidth = 2,
+    color,
+    ...props
+}: Props) {
+    const IconComponent = resolveIcon(
+        name.charAt(0).toUpperCase() + name.slice(1),
+    );
+
+    if (!IconComponent) {
+        return null;
+    }
+
+    return (
+        <IconComponent
+            className={cn('h-4 w-4', className)}
+            size={size}
+            strokeWidth={strokeWidth}
+            color={color}
+            {...props}
+        />
+    );
+}
+
+export default Icon;

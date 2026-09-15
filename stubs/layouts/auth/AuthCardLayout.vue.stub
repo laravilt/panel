@@ -1,12 +1,5 @@
 <script setup lang="ts">
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import { NotificationContainer } from '@laravilt/notifications/app.ts';
 import { home } from '@/routes';
 import { Link } from '@inertiajs/vue3';
@@ -19,33 +12,39 @@ defineProps<{
 
 <template>
     <div
-        class="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10"
+        class="isolate flex min-h-svh max-w-screen flex-col overflow-x-clip bg-background"
     >
-        <div class="flex w-full max-w-md flex-col gap-6">
-            <Link
-                :href="home()"
-                class="flex items-center gap-2 self-center font-medium"
+        <div
+            class="mx-auto flex w-full max-w-md flex-1 flex-col justify-center border-x border-line"
+        >
+            <!-- Brand -->
+            <div
+                class="screen-line-top screen-line-bottom flex items-center justify-center py-5"
             >
-                <div class="flex h-9 w-9 items-center justify-center">
-                    <AppLogoIcon
-                        class="size-9 fill-current text-black dark:text-white"
-                    />
-                </div>
-            </Link>
-
-            <div class="flex flex-col gap-6">
-                <Card class="rounded-xl">
-                    <CardHeader class="px-10 pt-8 pb-0 text-center">
-                        <CardTitle class="text-xl">{{ title }}</CardTitle>
-                        <CardDescription>
-                            {{ description }}
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent class="px-10 py-8">
-                        <slot />
-                    </CardContent>
-                </Card>
+                <Link
+                    :href="home()"
+                    class="flex items-center gap-2 self-center font-medium"
+                >
+                    <AppLogoIcon class="size-10" />
+                </Link>
             </div>
+
+            <div class="stripe-divider" />
+
+            <!-- Card -->
+            <div
+                class="screen-line-top screen-line-bottom flex flex-col gap-2 px-6 pt-8 pb-6 text-center md:px-10"
+            >
+                <h1 class="text-xl leading-none font-semibold">{{ title }}</h1>
+                <p class="text-sm text-muted-foreground">
+                    {{ description }}
+                </p>
+            </div>
+            <div class="screen-line-bottom px-6 py-8 md:px-10">
+                <slot />
+            </div>
+
+            <div class="stripe-divider" />
         </div>
         <NotificationContainer />
     </div>

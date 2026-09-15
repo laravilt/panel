@@ -1,0 +1,54 @@
+import type { User } from '@/types/auth';
+import type { NavItem } from '@/types/navigation';
+
+export type MenuItem = {
+    type: 'item' | 'separator';
+    title?: string;
+    url?: string;
+    icon?: string;
+    method?: 'get' | 'post';
+    translationKey?: string;
+};
+
+export type PanelFont = {
+    provider: string;
+    family: string;
+    url: string;
+    weights: number[];
+    subsets?: string[];
+    display?: string;
+};
+
+export type Panel = {
+    id: string;
+    path: string;
+    brandName?: string;
+    brandLogo?: string;
+    navigation?: NavItem[];
+    userMenu?: MenuItem[];
+    hasDatabaseNotifications?: boolean;
+    databaseNotificationsPolling?: string;
+    availableLocales?: {
+        value: string;
+        label: string;
+        dir: string;
+        flag: string;
+    }[];
+    currentLocale?: string;
+    hasDarkMode?: boolean;
+    hasGlobalSearch?: boolean;
+    globalSearchEndpoint?: string;
+    globalSearchConfig?: any;
+    hasAI?: boolean;
+    aiConfig?: any;
+    font?: PanelFont | null;
+    user?: User;
+    auth?: {
+        hasProfile: boolean;
+        hasLogin: boolean;
+        hasRegistration: boolean;
+        hasPasswordReset: boolean;
+        hasEmailVerification: boolean;
+        hasOtp: boolean;
+    };
+};

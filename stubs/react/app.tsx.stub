@@ -1,0 +1,109 @@
+import { createInertiaApp } from '@inertiajs/react';
+import LaraviltForms from '@laravilt/forms/app';
+import { notify } from '@laravilt/notifications/app';
+import LaraviltTables from '@laravilt/tables/app';
+import LaraviltWidgets from '@laravilt/widgets/app';
+import type { ComponentType } from 'react';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { initializeTheme } from '@/hooks/use-appearance';
+import AppLayout from '@/layouts/app-layout';
+import AuthLayout from '@/layouts/auth-layout';
+
+type PageModule = { default: ComponentType<any> };
+
+// Make notify globally available
+if (typeof window !== 'undefined') {
+    (window as any).notify = notify;
+}
+
+// Register the laravilt-* components used by the dynamic component renderers
+LaraviltForms.register();
+LaraviltTables.register();
+LaraviltWidgets.register();
+
+const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+const PANEL_PAGES = '../../vendor/laravilt/panel/resources/react/pages';
+const AUTH_PAGES = '../../vendor/laravilt/auth/resources/react/Pages';
+const AI_PAGES = '../../vendor/laravilt/ai/resources/react/pages';
+
+const appPages = import.meta.glob<PageModule>('./pages/**/*.tsx');
+const panelPages = import.meta.glob<PageModule>(
+    '../../vendor/laravilt/panel/resources/react/pages/**/*.tsx',
+);
+const authPages = import.meta.glob<PageModule>(
+    '../../vendor/laravilt/auth/resources/react/Pages/**/*.tsx',
+);
+const aiPages = import.meta.glob<PageModule>(
+    '../../vendor/laravilt/ai/resources/react/pages/**/*.tsx',
+);
+
+const pages: Record<string, () => Promise<PageModule>> = {
+    ...appPages,
+    ...panelPages,
+    ...authPages,
+    ...aiPages,
+};
+
+/**
+ * Candidate files for a page name, in resolution order:
+ * `laravilt-auth/*` → auth pages only; otherwise app → panel → auth → ai.
+ */
+function pageCandidates(name: string): string[] {
+    if (name.startsWith('laravilt-auth/')) {
+        return [`${AUTH_PAGES}/${name.replace('laravilt-auth/', '')}.tsx`];
+    }
+
+    return [
+        `./pages/${name}.tsx`,
+        `${PANEL_PAGES}/${name}.tsx`,
+        `${AUTH_PAGES}/${name}.tsx`,
+        `${AI_PAGES}/${name}.tsx`,
+    ];
+}
+
+void createInertiaApp({
+    title: (title) => (title ? `${title} - ${appName}` : appName),
+    resolve: async (name) => {
+        for (const path of pageCandidates(name)) {
+            const page = pages[path];
+
+            if (page) {
+                return (await page()).default;
+            }
+        }
+
+        throw new Error(`Page not found: ${name}`);
+    },
+    layout: (name) => {
+        // Laravilt vendor pages render their own layout (PanelLayout, auth layouts, ...)
+        if (!(`./pages/${name}.tsx` in appPages)) {
+            return null;
+        }
+
+        switch (true) {
+            case name === 'welcome':
+                return null;
+            case name.startsWith('auth/'):
+                return AuthLayout;
+            default:
+                return AppLayout;
+        }
+    },
+    strictMode: true,
+    withApp(app) {
+        return (
+            <TooltipProvider delayDuration={0}>
+                {app}
+                <Toaster />
+            </TooltipProvider>
+        );
+    },
+    progress: {
+        color: '#4B5563',
+    },
+});
+
+// This will set light / dark mode on load...
+initializeTheme();

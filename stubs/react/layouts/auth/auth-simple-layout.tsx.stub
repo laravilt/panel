@@ -1,0 +1,39 @@
+import { Link } from '@inertiajs/react';
+import { NotificationContainer } from '@laravilt/notifications/app';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { home } from '@/routes';
+import type { AuthLayoutProps } from '@/types';
+
+export default function AuthSimpleLayout({
+    children,
+    title,
+    description,
+}: AuthLayoutProps) {
+    return (
+        <div className="isolate flex min-h-svh max-w-screen flex-col overflow-x-clip bg-background">
+            <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center border-x border-line">
+                <div className="stripe-divider" />
+                <div className="screen-line-top screen-line-bottom flex flex-col items-center gap-4 px-6 pt-10 pb-8 md:px-10">
+                    <Link
+                        href={home()}
+                        className="flex flex-col items-center gap-2 font-medium"
+                    >
+                        <AppLogoIcon className="size-12" />
+                        <span className="sr-only">{title}</span>
+                    </Link>
+                    <div className="space-y-2 text-center">
+                        <h1 className="text-xl font-medium">{title}</h1>
+                        <p className="text-center text-sm text-muted-foreground">
+                            {description}
+                        </p>
+                    </div>
+                </div>
+                <div className="screen-line-bottom px-6 py-8 md:px-10">
+                    {children}
+                </div>
+                <div className="stripe-divider" />
+            </div>
+            <NotificationContainer />
+        </div>
+    );
+}

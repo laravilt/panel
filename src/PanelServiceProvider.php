@@ -42,6 +42,7 @@ use Laravilt\Panel\Pages\ListRecords;
 use Laravilt\Panel\Pages\ManageRecords;
 use Laravilt\Panel\Resources\NestedResource;
 use Laravilt\Panel\Tenancy\MultiDatabaseManager;
+use Laravilt\Support\Frontend;
 use Laravilt\Tables\ApiResource;
 use Laravilt\Tables\Columns\ToggleColumn;
 use Laravilt\Tables\Table;
@@ -106,29 +107,35 @@ class PanelServiceProvider extends ServiceProvider
             __DIR__.'/../lang' => lang_path('vendor/laravilt-panel'),
         ], 'laravilt-panel-lang');
 
+        // Frontend sources follow the application's stack (resources/js = Vue, resources/react = React)
+        $frontend = class_exists(Frontend::class) ? Frontend::resourceDirectory() : 'js';
+        $stubs = $frontend === 'react' ? __DIR__.'/../stubs/react' : __DIR__.'/../stubs';
+
         // Publish frontend views/pages
         $this->publishes([
-            __DIR__.'/../resources/js/pages/laravilt' => resource_path('js/pages/laravilt'),
+            __DIR__."/../resources/{$frontend}/pages/laravilt" => resource_path('js/pages/laravilt'),
         ], 'laravilt-panel-views');
 
         // Publish frontend components
         $this->publishes([
-            __DIR__.'/../resources/js/components' => resource_path('js/components/laravilt'),
+            __DIR__."/../resources/{$frontend}/components" => resource_path('js/components/laravilt'),
         ], 'laravilt-panel-assets');
 
-        // Publish UI components (Reka UI/Radix Vue primitives)
+        // Publish UI components (shadcn-vue/Reka UI or shadcn/ui/Radix primitives)
         $this->publishes([
-            __DIR__.'/../stubs/ui' => resource_path('js/components/ui'),
+            "{$stubs}/ui" => resource_path('js/components/ui'),
         ], 'laravilt-panel-ui');
 
         // Publish lib utilities (utils.ts with urlIsActive, etc.)
         $this->publishes([
-            __DIR__.'/../stubs/lib' => resource_path('js/lib'),
+            "{$stubs}/lib" => resource_path('js/lib'),
         ], 'laravilt-panel-lib');
 
         // Publish NavMain component
-        $this->publishes([
-            __DIR__.'/../stubs/components/NavMain.vue.stub' => resource_path('js/components/NavMain.vue'),
+        $this->publishes($frontend === 'react' ? [
+            "{$stubs}/components/nav-main.tsx.stub" => resource_path('js/components/nav-main.tsx'),
+        ] : [
+            "{$stubs}/components/NavMain.vue.stub" => resource_path('js/components/NavMain.vue'),
         ], 'laravilt-panel-components');
 
         // Publish Teams migration (for teams-based tenancy)

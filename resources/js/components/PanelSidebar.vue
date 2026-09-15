@@ -115,17 +115,17 @@ const hasTenancy = computed(() => panel.value.hasTenancy || false);
                         <Link :href="dashboardHref">
                             <!-- Brand Logo -->
                             <div
-                                class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground"
+                                class="flex aspect-square size-8 items-center justify-center"
                             >
                                 <img
                                     v-if="panel.brandLogo"
                                     :src="panel.brandLogo"
                                     :alt="panel.brandName || 'Logo'"
-                                    class="size-5 object-contain"
+                                    class="size-7 object-contain"
                                 />
                                 <AppLogoIcon
                                     v-else
-                                    class="size-5 fill-current text-white dark:text-black"
+                                    class="size-7"
                                 />
                             </div>
                             <!-- Brand Name -->

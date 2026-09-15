@@ -1,0 +1,127 @@
+import { Link, usePage } from '@inertiajs/react';
+import { resolveIcon } from '@laravilt/support/lib/icons';
+import type { LucideIcon } from 'lucide-react';
+import { BookOpen, FolderGit2, House, LayoutGrid } from 'lucide-react';
+import AppLogo from '@/components/app-logo';
+import { NavFooter } from '@/components/nav-footer';
+import { NavMain } from '@/components/nav-main';
+import { NavUser } from '@/components/nav-user';
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+} from '@/components/ui/sidebar';
+import type { NavItem } from '@/types';
+
+/**
+ * Fallback dashboard URL for non-panel pages. The Vue stub uses the Wayfinder `admin.dashboard`
+ * route, which only exists when the panel id is "admin"; a literal keeps this file compiling
+ * for any panel id.
+ */
+const DEFAULT_DASHBOARD_URL = '/admin';
+
+// Default navigation items for non-panel pages
+const defaultMainNavItems: NavItem[] = [
+    {
+        title: 'Dashboard',
+        href: DEFAULT_DASHBOARD_URL,
+        icon: LayoutGrid,
+    },
+];
+
+const footerNavItems: NavItem[] = [
+    {
+        title: 'Repository',
+        href: 'https://github.com/laravel/react-starter-kit',
+        icon: FolderGit2,
+    },
+    {
+        title: 'Documentation',
+        href: 'https://laravel.com/docs/starter-kits#react',
+        icon: BookOpen,
+    },
+];
+
+// Legacy heroicon names → lucide names
+const heroiconMap: Record<string, string> = {
+    'heroicon-o-home': 'House',
+    'heroicon-o-user': 'User',
+    'heroicon-o-users': 'Users',
+    'heroicon-o-cog': 'Settings',
+    'heroicon-o-chart-bar': 'ChartBar',
+    'heroicon-o-document-text': 'FileText',
+    'heroicon-o-folder': 'Folder',
+    'heroicon-o-shopping-cart': 'ShoppingCart',
+};
+
+// Get Lucide icon component from icon name
+const getIconComponent = (iconName: string | null | undefined): LucideIcon => {
+    if (!iconName) {
+        return House;
+    }
+
+    if (iconName.startsWith('heroicon-o-')) {
+        return resolveIcon(heroiconMap[iconName] || 'LayoutGrid') ?? House;
+    }
+
+    return resolveIcon(iconName) ?? House;
+};
+
+const toNavItem = (item: any): NavItem => ({
+    title: item.title,
+    href: item.url,
+    url: item.url,
+    icon: getIconComponent(item.icon),
+    badge: item.badge || item.navigationBadge,
+    badgeCount: item.badgeCount || item.navigationBadgeCount,
+    badgeColor: item.badgeColor || item.navigationBadgeColor,
+});
+
+export function AppSidebar() {
+    // Get panel data from Inertia shared props
+    const panel = usePage().props.panel as any;
+
+    // Convert panel navigation to NavItem format (groups are flattened into their items)
+    const mainNavItems: NavItem[] =
+        panel?.navigation && Array.isArray(panel.navigation)
+            ? panel.navigation.flatMap((navItem: any) =>
+                  navItem.items && Array.isArray(navItem.items)
+                      ? navItem.items.map(toNavItem)
+                      : [toNavItem(navItem)],
+              )
+            : defaultMainNavItems;
+
+    // Dashboard URL - use panel path if available
+    const dashboardHref = panel?.path
+        ? `/${panel.path}`
+        : DEFAULT_DASHBOARD_URL;
+
+    return (
+        <Sidebar collapsible="icon" variant="inset">
+            <SidebarHeader>
+                <SidebarMenu>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton size="lg" asChild>
+                            <Link href={dashboardHref} prefetch>
+                                <AppLogo />
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                </SidebarMenu>
+            </SidebarHeader>
+
+            <SidebarContent>
+                <NavMain items={mainNavItems} />
+            </SidebarContent>
+
+            <SidebarFooter>
+                <NavFooter items={footerNavItems} className="mt-auto" />
+                <NavUser />
+            </SidebarFooter>
+        </Sidebar>
+    );
+}

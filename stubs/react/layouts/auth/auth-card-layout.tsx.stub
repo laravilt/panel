@@ -1,0 +1,47 @@
+import { Link } from '@inertiajs/react';
+import { NotificationContainer } from '@laravilt/notifications/app';
+import type { PropsWithChildren } from 'react';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { home } from '@/routes';
+
+export default function AuthCardLayout({
+    children,
+    title,
+    description,
+}: PropsWithChildren<{
+    name?: string;
+    title?: string;
+    description?: string;
+}>) {
+    return (
+        <div className="isolate flex min-h-svh max-w-screen flex-col overflow-x-clip bg-background">
+            <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center border-x border-line">
+                {/* Brand */}
+                <div className="screen-line-top screen-line-bottom flex items-center justify-center py-5">
+                    <Link
+                        href={home()}
+                        className="flex items-center gap-2 self-center font-medium"
+                    >
+                        <AppLogoIcon className="size-10" />
+                    </Link>
+                </div>
+
+                <div className="stripe-divider" />
+
+                {/* Card */}
+                <div className="screen-line-top screen-line-bottom flex flex-col gap-2 px-6 pt-8 pb-6 text-center md:px-10">
+                    <h1 className="text-xl leading-none font-semibold">{title}</h1>
+                    <p className="text-sm text-muted-foreground">
+                        {description}
+                    </p>
+                </div>
+                <div className="screen-line-bottom px-6 py-8 md:px-10">
+                    {children}
+                </div>
+
+                <div className="stripe-divider" />
+            </div>
+            <NotificationContainer />
+        </div>
+    );
+}

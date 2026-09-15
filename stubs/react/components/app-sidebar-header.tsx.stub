@@ -1,0 +1,35 @@
+import { usePage } from '@inertiajs/react';
+import GlobalSearch from '@laravilt/ai/components/GlobalSearch';
+import NotificationCenter from '@laravilt/notifications/components/NotificationCenter';
+import LanguageSwitcher from '@laravilt/panel/components/LanguageSwitcher';
+import { Breadcrumbs } from '@/components/breadcrumbs';
+import { SidebarTrigger } from '@/components/ui/sidebar';
+import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
+
+export function AppSidebarHeader({
+    breadcrumbs = [],
+}: {
+    breadcrumbs?: BreadcrumbItemType[];
+}) {
+    const { panel } = usePage().props;
+
+    const hasDatabaseNotifications = panel?.hasDatabaseNotifications || false;
+    const hasLanguageSwitcher = (panel?.availableLocales?.length || 0) > 1;
+    const hasGlobalSearch = panel?.hasGlobalSearch ?? true;
+
+    return (
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border/70 px-6 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 md:px-4">
+            <div className="flex flex-1 items-center gap-2">
+                <SidebarTrigger className="-ml-1" />
+                {breadcrumbs && breadcrumbs.length > 0 && (
+                    <Breadcrumbs breadcrumbs={breadcrumbs} />
+                )}
+            </div>
+            <div className="flex items-center gap-2">
+                {hasGlobalSearch && <GlobalSearch />}
+                {hasLanguageSwitcher && <LanguageSwitcher />}
+                {hasDatabaseNotifications && <NotificationCenter />}
+            </div>
+        </header>
+    );
+}

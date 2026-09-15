@@ -1,0 +1,26 @@
+import type { InertiaLinkProps } from '@inertiajs/react';
+import type { LucideIcon } from 'lucide-react';
+
+export type BreadcrumbItem = {
+    title: string;
+    href: NonNullable<InertiaLinkProps['href']>;
+};
+
+export type BreadcrumbItemType = BreadcrumbItem;
+
+export type NavItem = {
+    title: string;
+    href: NonNullable<InertiaLinkProps['href']>;
+    icon?: LucideIcon | null;
+    isActive?: boolean;
+    /** Laravilt panel navigation: `item` or `group` (groups carry `items`). */
+    type?: 'item' | 'group' | string;
+    url?: string;
+    items?: NavItem[];
+    collapsed?: boolean;
+    badge?: string | number | null;
+    badgeCount?: string | number | null;
+    badgeColor?: string | null;
+    /** Marks the item active for every URL below this prefix (clusters). */
+    activeMatchPrefix?: string | null;
+};

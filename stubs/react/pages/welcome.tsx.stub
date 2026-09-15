@@ -1,0 +1,184 @@
+import { Head, usePage } from '@inertiajs/react';
+import {
+    ArrowRight,
+    Bell,
+    BookOpen,
+    LayoutDashboard,
+    LayoutList,
+    MousePointerClick,
+    ShieldCheck,
+    Sparkles,
+    Table2,
+    TextCursorInput,
+} from 'lucide-react';
+import AppLogoIcon from '@/components/app-logo-icon';
+
+// Default panel URLs (the panel id/path is "admin" out of the box)
+const adminUrl = '/admin';
+const loginUrl = '/admin/login';
+const registerUrl = '/admin/register';
+
+const features = [
+    { title: 'Forms', description: 'Reactive fields, layouts and validation, declared in PHP.', icon: TextCursorInput },
+    { title: 'Tables', description: 'Searchable, sortable and filterable tables with bulk actions.', icon: Table2 },
+    { title: 'Actions', description: 'Buttons, modals and confirmations wired to server logic.', icon: MousePointerClick },
+    { title: 'Infolists', description: 'Read-only record views composed of typed entries.', icon: LayoutList },
+    { title: 'Widgets', description: 'Stats, charts and dashboard cards for every panel.', icon: LayoutDashboard },
+    { title: 'Notifications', description: 'Toast and database notifications from anywhere.', icon: Bell },
+    { title: 'AI', description: 'AI assistants and generation built into your panels.', icon: Sparkles },
+    { title: 'Auth', description: 'Login, registration, 2FA, passkeys and profile pages.', icon: ShieldCheck },
+];
+
+export default function Welcome({
+    laravelVersion,
+    phpVersion,
+}: {
+    laravelVersion?: string;
+    phpVersion?: string;
+}) {
+    const user = (usePage().props as any).auth?.user;
+
+    return (
+        <>
+            <Head title="Welcome" />
+            <div className="isolate flex min-h-svh max-w-screen flex-col overflow-x-clip bg-background text-foreground selection:bg-brand selection:text-brand-foreground">
+                <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col border-x border-line">
+                    {/* Header */}
+                    <header className="screen-line-bottom flex h-16 items-center justify-between gap-4 px-4 sm:px-6">
+                        <a href="/" className="flex items-center gap-2.5">
+                            <AppLogoIcon className="size-8" />
+                            <span className="text-lg font-semibold tracking-tight">Laravilt</span>
+                        </a>
+                        <nav className="flex items-center gap-2 text-sm font-medium">
+                            {user ? (
+                                <a
+                                    href={adminUrl}
+                                    className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-primary-foreground transition-colors hover:bg-primary/90"
+                                >
+                                    Admin
+                                </a>
+                            ) : (
+                                <>
+                                    <a
+                                        href={loginUrl}
+                                        className="inline-flex h-9 items-center rounded-md px-3 transition-colors hover:bg-accent"
+                                    >
+                                        Log in
+                                    </a>
+                                    <a
+                                        href={registerUrl}
+                                        className="inline-flex h-9 items-center rounded-md border border-line px-4 transition-colors hover:bg-accent"
+                                    >
+                                        Register
+                                    </a>
+                                </>
+                            )}
+                        </nav>
+                    </header>
+
+                    <div className="stripe-divider" />
+
+                    <main className="flex flex-col">
+                        {/* Hero */}
+                        <section className="screen-line-top screen-line-bottom flex flex-col items-center px-6 py-16 text-center sm:py-24">
+                            <AppLogoIcon className="size-20 sm:size-24" />
+                            <h1 className="mt-6 text-5xl font-semibold tracking-tight sm:text-6xl">
+                                Laravilt
+                            </h1>
+                            <p className="mt-4 max-w-xl text-lg text-balance text-muted-foreground">
+                                Elegant admin panels for Laravel, built with Inertia.
+                            </p>
+                            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-sm font-medium">
+                                <a
+                                    href={adminUrl}
+                                    className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-5 text-primary-foreground transition-colors hover:bg-primary/90"
+                                >
+                                    Open admin panel
+                                    <ArrowRight className="size-4 rtl:rotate-180" />
+                                </a>
+                                <a
+                                    href="https://laravilt.com/docs"
+                                    target="_blank"
+                                    rel="noopener"
+                                    className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-5 transition-colors hover:bg-accent"
+                                >
+                                    <BookOpen className="size-4" />
+                                    Documentation
+                                </a>
+                            </div>
+                        </section>
+
+                        <div className="stripe-divider" />
+
+                        {/* Features */}
+                        <section className="screen-line-top screen-line-bottom">
+                            <div className="screen-line-bottom flex items-center justify-between gap-4 px-6 py-4">
+                                <h2 className="text-sm font-medium">Everything a panel needs</h2>
+                                <span className="font-mono text-xs text-muted-foreground">laravilt/*</span>
+                            </div>
+                            <div className="overflow-hidden">
+                                <ul className="-me-px -mb-px grid sm:grid-cols-2 lg:grid-cols-4">
+                                    {features.map((feature, index) => {
+                                        const Icon = feature.icon;
+
+                                        return (
+                                            <li
+                                                key={feature.title}
+                                                className="flex flex-col gap-3 border-e border-b border-line p-6"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <Icon className="size-5 text-brand-accent" />
+                                                    <span className="font-mono text-xs text-muted-foreground">
+                                                        {String(index + 1).padStart(2, '0')}
+                                                    </span>
+                                                </div>
+                                                <h3 className="font-medium">{feature.title}</h3>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {feature.description}
+                                                </p>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        </section>
+
+                        <div className="stripe-divider" />
+                    </main>
+
+                    {/* Footer */}
+                    <footer className="screen-line-top screen-line-bottom flex flex-col items-center justify-between gap-3 px-6 py-5 text-sm text-muted-foreground sm:flex-row">
+                        <div className="flex items-center gap-2">
+                            <AppLogoIcon className="size-5" />
+                            {laravelVersion && phpVersion ? (
+                                <span>
+                                    Laravel v{laravelVersion} (PHP v{phpVersion})
+                                </span>
+                            ) : (
+                                <span>Laravilt</span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                            <a
+                                href="https://laravilt.com/docs"
+                                target="_blank"
+                                rel="noopener"
+                                className="transition-colors hover:text-foreground"
+                            >
+                                Documentation
+                            </a>
+                            <a
+                                href="https://github.com/laravilt/laravilt"
+                                target="_blank"
+                                rel="noopener"
+                                className="transition-colors hover:text-foreground"
+                            >
+                                GitHub
+                            </a>
+                        </div>
+                    </footer>
+                </div>
+            </div>
+        </>
+    );
+}

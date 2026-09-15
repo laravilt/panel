@@ -1,0 +1,545 @@
+@import 'tailwindcss';
+
+@import 'tw-animate-css';
+
+@source '../views';
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/* Laravilt packages - scan for Tailwind classes (vendor is gitignored, so list it explicitly) */
+@source '../../vendor/laravilt/*/resources/react/**/*.ts';
+@source '../../vendor/laravilt/*/resources/react/**/*.tsx';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+    --font-sans:
+        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+        'Noto Color Emoji';
+
+    --radius-lg: var(--radius);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+
+    --color-popover: var(--popover);
+    --color-popover-foreground: var(--popover-foreground);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-destructive: var(--destructive);
+    --color-destructive-foreground: var(--destructive-foreground);
+
+    --color-border: var(--border);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-chart-1: var(--chart-1);
+    --color-chart-2: var(--chart-2);
+    --color-chart-3: var(--chart-3);
+    --color-chart-4: var(--chart-4);
+    --color-chart-5: var(--chart-5);
+
+    --color-sidebar: var(--sidebar-background);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-ring: var(--sidebar-ring);
+
+    /* Laravilt brand */
+    --color-brand: var(--brand);
+    --color-brand-foreground: var(--brand-foreground);
+    --color-brand-accent: var(--brand-accent);
+    --color-line: var(--line);
+}
+
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentColor);
+    }
+}
+
+/* Panel font: usePanelFont() overrides --font-sans at runtime */
+@layer utilities {
+    body,
+    html {
+        --font-sans:
+            'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+            'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+            'Noto Color Emoji';
+    }
+}
+
+:root {
+    /* Laravilt brand (laravilt.com/brand): #FF2D20, #f0ebe1, #9553E9 */
+    --brand: hsl(3.5 100% 56.3%);
+    --brand-foreground: hsl(40 33.3% 91.2%);
+    --brand-accent: hsl(266.4 77.3% 62%);
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 3.9%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(0 0% 3.9%);
+    --popover: hsl(0 0% 100%);
+    --popover-foreground: hsl(0 0% 3.9%);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
+    --secondary: hsl(0 0% 92.1%);
+    --secondary-foreground: hsl(0 0% 9%);
+    --muted: hsl(0 0% 96.1%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --accent: hsl(0 0% 96.1%);
+    --accent-foreground: hsl(0 0% 9%);
+    --destructive: hsl(0 84.2% 60.2%);
+    --destructive-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 92.8%);
+    --input: hsl(0 0% 89.8%);
+    --ring: var(--brand);
+    --chart-1: hsl(12 76% 61%);
+    --chart-2: hsl(173 58% 39%);
+    --chart-3: hsl(197 37% 24%);
+    --chart-4: hsl(43 74% 66%);
+    --chart-5: hsl(27 87% 67%);
+    --radius: 0.5rem;
+    --sidebar-background: hsl(0 0% 98%);
+    --sidebar-foreground: hsl(240 5.3% 26.1%);
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: var(--brand-foreground);
+    --sidebar-accent: hsl(0 0% 94%);
+    --sidebar-accent-foreground: hsl(0 0% 30%);
+    --sidebar-border: hsl(0 0% 91%);
+    --sidebar-ring: var(--brand);
+    --sidebar: hsl(0 0% 98%);
+    /* Hairline grid colour used by border-line, screen-line-*, stripe-divider */
+    --line: color-mix(in oklab, var(--border) 64%, var(--background));
+}
+
+.dark {
+    /* Laravilt brand (laravilt.com/brand): #FF2D20, #f0ebe1, #9553E9 */
+    --brand: hsl(3.5 100% 56.3%);
+    --brand-foreground: hsl(40 33.3% 91.2%);
+    --brand-accent: hsl(266.4 77.3% 62%);
+    --background: hsl(0 0% 3.9%);
+    --foreground: hsl(0 0% 98%);
+    --card: hsl(0 0% 3.9%);
+    --card-foreground: hsl(0 0% 98%);
+    --popover: hsl(0 0% 3.9%);
+    --popover-foreground: hsl(0 0% 98%);
+    --primary: var(--brand);
+    --primary-foreground: var(--brand-foreground);
+    --secondary: hsl(0 0% 14.9%);
+    --secondary-foreground: hsl(0 0% 98%);
+    --muted: hsl(0 0% 16.08%);
+    --muted-foreground: hsl(0 0% 63.9%);
+    --accent: hsl(0 0% 14.9%);
+    --accent-foreground: hsl(0 0% 98%);
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(0 0% 98%);
+    --border: hsl(0 0% 14.9%);
+    --input: hsl(0 0% 14.9%);
+    --ring: var(--brand);
+    --chart-1: hsl(220 70% 50%);
+    --chart-2: hsl(160 60% 45%);
+    --chart-3: hsl(30 80% 55%);
+    --chart-4: hsl(280 65% 60%);
+    --chart-5: hsl(340 75% 55%);
+    --sidebar-background: hsl(0 0% 7%);
+    --sidebar-foreground: hsl(0 0% 95.9%);
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: var(--brand-foreground);
+    --sidebar-accent: hsl(0 0% 15.9%);
+    --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+    --sidebar-border: hsl(0 0% 15.9%);
+    --sidebar-ring: var(--brand);
+    --sidebar: hsl(240 5.9% 10%);
+    /* Hairline grid colour used by border-line, screen-line-*, stripe-divider */
+    --line: color-mix(in oklab, var(--border) 64%, var(--background));
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+    }
+}
+
+/*
+  Laravilt grid-line utilities (hairline "panel grid" look).
+  - border-line:        hairline border colour (same as border-color: var(--line))
+  - screen-line-top:    full-bleed 1px line along the element's top edge
+  - screen-line-bottom: full-bleed 1px line along the element's bottom edge
+  - stripe-divider:     full-bleed, 2rem-tall diagonal-stripe band between sections
+  The lines are painted behind content (z-index: -1), so keep the section itself
+  transparent and give the page wrapper `isolate overflow-x-clip`.
+*/
+@utility border-line {
+    border-color: var(--line);
+}
+
+@utility screen-line-top {
+    position: relative;
+
+    &::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: 0;
+        left: -100vw;
+        width: 200vw;
+        height: 1px;
+        background-color: var(--line);
+    }
+}
+
+@utility screen-line-bottom {
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        bottom: 0;
+        left: -100vw;
+        width: 200vw;
+        height: 1px;
+        background-color: var(--line);
+    }
+}
+
+@utility stripe-divider {
+    position: relative;
+    height: 2rem;
+
+    &::before {
+        content: '';
+        position: absolute;
+        z-index: -1;
+        top: 0;
+        left: -100vw;
+        width: 200vw;
+        height: 100%;
+        --pattern-foreground: color-mix(in oklab, var(--line) 56%, transparent);
+        background-image: repeating-linear-gradient(
+            315deg,
+            var(--pattern-foreground) 0,
+            var(--pattern-foreground) 1px,
+            transparent 0,
+            transparent 50%
+        );
+        background-size: 10px 10px;
+    }
+}
+
+/* Collapsible Content - animation only when user clicks (data-animating on parent) */
+@layer utilities {
+    /* Default: no animation */
+    [data-slot='collapsible-content'] {
+        animation: none !important;
+    }
+
+    /* Animation only when parent has data-animating (user clicked) */
+    [data-animating='true']
+        [data-slot='collapsible-content'][data-state='open'] {
+        animation: collapsible-down 200ms ease-out !important;
+    }
+
+    [data-animating='true']
+        [data-slot='collapsible-content'][data-state='closed'] {
+        animation: collapsible-up 200ms ease-out !important;
+    }
+
+    @keyframes collapsible-down {
+        from {
+            height: 0;
+            opacity: 0;
+        }
+
+        to {
+            height: var(--radix-collapsible-content-height);
+            opacity: 1;
+        }
+    }
+
+    @keyframes collapsible-up {
+        from {
+            height: var(--radix-collapsible-content-height);
+            opacity: 1;
+        }
+
+        to {
+            height: 0;
+            opacity: 0;
+        }
+    }
+
+    /* Accordion Content Animation */
+    [data-state='open'][data-slot='accordion-content'] {
+        animation: accordion-down 200ms ease-out;
+    }
+
+    [data-state='closed'][data-slot='accordion-content'] {
+        animation: accordion-up 200ms ease-out;
+    }
+
+    @keyframes accordion-down {
+        from {
+            height: 0;
+            opacity: 0;
+        }
+
+        to {
+            height: var(--radix-accordion-content-height);
+            opacity: 1;
+        }
+    }
+
+    @keyframes accordion-up {
+        from {
+            height: var(--radix-accordion-content-height);
+            opacity: 1;
+        }
+
+        to {
+            height: 0;
+            opacity: 0;
+        }
+    }
+
+    /* Card hover effects */
+    .card-hoverable {
+        @apply transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-lg;
+    }
+
+    /* Button press effect */
+    .btn-press {
+        @apply transition-transform duration-100 active:scale-[0.98];
+    }
+
+    /* Fade in animation for content */
+    .fade-in {
+        animation: fade-in 200ms ease-out;
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+            transform: translateY(4px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Slide in from right for slide-over panels */
+    .slide-in-right {
+        animation: slide-in-right 300ms ease-out;
+    }
+
+    @keyframes slide-in-right {
+        from {
+            transform: translateX(100%);
+        }
+
+        to {
+            transform: translateX(0);
+        }
+    }
+
+    /* Scale in animation for modals */
+    .scale-in {
+        animation: scale-in 200ms ease-out;
+    }
+
+    @keyframes scale-in {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    /* Skeleton loading animation */
+    .skeleton-pulse {
+        animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes skeleton-pulse {
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.5;
+        }
+    }
+}
+
+/* RTL Support - Global styles */
+@layer utilities {
+    /* Slide in from left for RTL slide-over panels */
+    [dir='rtl'] .slide-in-right {
+        animation: slide-in-left 300ms ease-out;
+    }
+
+    @keyframes slide-in-left {
+        from {
+            transform: translateX(-100%);
+        }
+
+        to {
+            transform: translateX(0);
+        }
+    }
+}
+
+/* Ensure proper text alignment for RTL */
+[dir='rtl'] {
+    text-align: right;
+}
+
+[dir='rtl'] input,
+[dir='rtl'] textarea,
+[dir='rtl'] select {
+    text-align: right;
+}
+
+/* Fix checkbox and radio alignment in RTL */
+[dir='rtl'] input[type='checkbox'],
+[dir='rtl'] input[type='radio'] {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+/* Custom Scrollbar Styles */
+@layer utilities {
+    /* Scrollbar base styles */
+    .scrollbar-thin {
+        scrollbar-width: thin;
+    }
+
+    /* Custom scrollbar for WebKit browsers */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: hsl(0 0% 95%);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: hsl(0 0% 70%);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: hsl(0 0% 60%);
+    }
+
+    /* Dark mode scrollbar */
+    .dark ::-webkit-scrollbar-track {
+        background: hsl(0 0% 15%);
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+        background: hsl(0 0% 35%);
+    }
+
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background: hsl(0 0% 45%);
+    }
+
+    /* Sidebar scrollbar */
+    [data-sidebar] ::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    [data-sidebar] ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    [data-sidebar] ::-webkit-scrollbar-thumb {
+        background: var(--sidebar-border);
+        border-radius: 3px;
+    }
+
+    [data-sidebar] ::-webkit-scrollbar-thumb:hover {
+        background: var(--sidebar-accent);
+    }
+
+    /* Dropdown menu scrollbar */
+    [data-radix-menu-content] ::-webkit-scrollbar,
+    [data-slot='dropdown-menu-content'] ::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    [data-radix-menu-content] ::-webkit-scrollbar-track,
+    [data-slot='dropdown-menu-content'] ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    [data-radix-menu-content] ::-webkit-scrollbar-thumb,
+    [data-slot='dropdown-menu-content'] ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+    }
+
+    [data-radix-menu-content] ::-webkit-scrollbar-thumb:hover,
+    [data-slot='dropdown-menu-content'] ::-webkit-scrollbar-thumb:hover {
+        background: var(--muted-foreground);
+    }
+
+    /* Firefox scrollbar colors */
+    * {
+        scrollbar-color: hsl(0 0% 70%) hsl(0 0% 95%);
+    }
+
+    .dark * {
+        scrollbar-color: hsl(0 0% 35%) hsl(0 0% 15%);
+    }
+
+    [data-sidebar] {
+        scrollbar-color: var(--sidebar-border) transparent;
+    }
+}

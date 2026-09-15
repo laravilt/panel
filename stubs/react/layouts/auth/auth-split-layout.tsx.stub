@@ -1,0 +1,73 @@
+import { Link, usePage } from '@inertiajs/react';
+import { NotificationContainer } from '@laravilt/notifications/app';
+import AppLogoIcon from '@/components/app-logo-icon';
+import { home } from '@/routes';
+import type { AuthLayoutProps } from '@/types';
+
+export default function AuthSplitLayout({
+    children,
+    title,
+    description,
+}: AuthLayoutProps) {
+    const { name, quote } = usePage().props;
+
+    return (
+        <div className="isolate flex min-h-dvh max-w-screen flex-col overflow-x-clip bg-background">
+            {/* Brand bar */}
+            <header className="screen-line-bottom flex h-16 shrink-0 items-center px-6 lg:px-10">
+                <Link
+                    href={home()}
+                    className="flex items-center gap-2 text-lg font-medium"
+                >
+                    <AppLogoIcon className="size-8" />
+                    {name}
+                </Link>
+            </header>
+
+            <div className="grid flex-1 lg:grid-cols-2">
+                {/* Brand panel */}
+                <div className="hidden flex-col border-e border-line bg-background p-10 lg:flex">
+                    <div className="flex flex-1 items-center justify-center">
+                        <AppLogoIcon className="size-40" aria-hidden="true" />
+                    </div>
+                    {quote && (
+                        <div className="border-t border-line pt-8">
+                            <blockquote className="space-y-2">
+                                <p className="text-lg">
+                                    &ldquo;{quote.message}&rdquo;
+                                </p>
+                                <footer className="text-sm text-muted-foreground">
+                                    {quote.author}
+                                </footer>
+                            </blockquote>
+                        </div>
+                    )}
+                </div>
+
+                {/* Form */}
+                <div className="flex items-center justify-center px-4 py-10 sm:px-8">
+                    <div className="w-full border-x border-line sm:w-[400px]">
+                        <div className="screen-line-top screen-line-bottom flex flex-col gap-2 px-6 py-8 text-center">
+                            {title && (
+                                <h1 className="text-xl font-medium tracking-tight">
+                                    {title}
+                                </h1>
+                            )}
+                            {description && (
+                                <p className="text-sm text-balance text-muted-foreground">
+                                    {description}
+                                </p>
+                            )}
+                        </div>
+                        <div className="screen-line-bottom px-6 py-8">
+                            {children}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="stripe-divider shrink-0" />
+            <NotificationContainer />
+        </div>
+    );
+}

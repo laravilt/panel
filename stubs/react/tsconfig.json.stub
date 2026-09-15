@@ -1,0 +1,36 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "allowJs": true,
+        "noEmit": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "preserveSymlinks": true,
+        "forceConsistentCasingInFileNames": true,
+        "strict": true,
+        "noImplicitAny": true,
+        "skipLibCheck": true,
+        "paths": {
+            "@/*": ["./resources/js/*"],
+            "@laravilt/panel/*": ["./vendor/laravilt/panel/resources/react/*"],
+            "@laravilt/widgets/*": ["./vendor/laravilt/widgets/resources/react/*"],
+            "@laravilt/forms/*": ["./vendor/laravilt/forms/resources/react/*"],
+            "@laravilt/tables/*": ["./vendor/laravilt/tables/resources/react/*"],
+            "@laravilt/actions/*": ["./vendor/laravilt/actions/resources/react/*"],
+            "@laravilt/infolists/*": ["./vendor/laravilt/infolists/resources/react/*"],
+            "@laravilt/notifications/*": ["./vendor/laravilt/notifications/resources/react/*"],
+            "@laravilt/schemas/*": ["./vendor/laravilt/schemas/resources/react/*"],
+            "@laravilt/support/*": ["./vendor/laravilt/support/resources/react/*"],
+            "@laravilt/auth/*": ["./vendor/laravilt/auth/resources/react/*"],
+            "@laravilt/ai/*": ["./vendor/laravilt/ai/resources/react/*"]
+        },
+        "jsx": "react-jsx"
+    },
+    "include": [
+        "resources/js/**/*.ts",
+        "resources/js/**/*.d.ts",
+        "resources/js/**/*.tsx"
+    ]
+}

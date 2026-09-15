@@ -1,0 +1,109 @@
+import { usePage } from '@inertiajs/react';
+import { useCallback, useEffect } from 'react';
+import type { PanelFont } from '@/types';
+
+/**
+ * Load a font stylesheet dynamically.
+ */
+function loadFontStylesheet(url: string, fontFamily: string): void {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const linkId = `panel-font-${fontFamily.replace(/\s+/g, '-').toLowerCase()}`;
+
+    // Check if the link already exists
+    if (document.getElementById(linkId)) {
+        return;
+    }
+
+    const link = document.createElement('link');
+    link.id = linkId;
+    link.rel = 'stylesheet';
+    link.href = url;
+    document.head.appendChild(link);
+}
+
+/**
+ * Apply the font family to the document body.
+ */
+function applyFontFamily(fontFamily: string): void {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const fontValue = `"${fontFamily}", ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'`;
+
+    // Set CSS custom property for the font family on :root
+    document.documentElement.style.setProperty('--font-sans', fontValue);
+
+    // Also set it directly on body and html to override Tailwind's @theme inline
+    document.body.style.fontFamily = 'var(--font-sans)';
+    document.documentElement.style.fontFamily = 'var(--font-sans)';
+}
+
+/**
+ * Read the initial Inertia page JSON (Inertia v3 script element, or the legacy data-page attribute).
+ */
+function readInitialPageData(): string | null | undefined {
+    const script = document.querySelector(
+        'script[data-page="app"][type="application/json"]',
+    );
+
+    return script ? script.textContent : document.getElementById('app')?.dataset?.page;
+}
+
+/**
+ * Initialize the panel font from page props.
+ */
+export function initializePanelFont(): void {
+    if (typeof window === 'undefined') {
+        return;
+    }
+
+    const pageData = readInitialPageData();
+
+    if (pageData) {
+        try {
+            const props = JSON.parse(pageData);
+            const font = props.props?.panel?.font as PanelFont | null;
+
+            if (font?.url && font?.family) {
+                loadFontStylesheet(font.url, font.family);
+                applyFontFamily(font.family);
+            }
+        } catch {
+            // Ignore parsing errors
+        }
+    }
+}
+
+/**
+ * Hook for managing panel fonts.
+ */
+export function usePanelFont() {
+    const { panel } = usePage().props;
+
+    const font = panel?.font || null;
+    const fontFamily = font?.family || null;
+    const fontUrl = font?.url || null;
+
+    const loadFont = useCallback(() => {
+        if (fontUrl && fontFamily) {
+            loadFontStylesheet(fontUrl, fontFamily);
+            applyFontFamily(fontFamily);
+        }
+    }, [fontUrl, fontFamily]);
+
+    // Load on mount and whenever the font changes (SPA navigation between panels)
+    useEffect(() => {
+        loadFont();
+    }, [loadFont]);
+
+    return {
+        font,
+        fontFamily,
+        fontUrl,
+        loadFont,
+    };
+}
