@@ -54,6 +54,39 @@ const tabs = computed(() => {
     }))
 })
 
+// Tabs a11y: ids, roving tabindex and arrow-key navigation
+const tabsId = `relation-managers-${props.resourceSlug}-${props.ownerRecordId}`
+const tabId = (key: string) => `${tabsId}-tab-${key}`
+const tabPanelId = (key: string) => `${tabsId}-panel-${key}`
+const tabRefs = ref<HTMLButtonElement[]>([])
+
+const onTabKeydown = (event: KeyboardEvent, index: number) => {
+    const count = tabs.value.length
+    if (count === 0) return
+    const isRtl = (event.currentTarget as HTMLElement | null)?.closest('[dir="rtl"]') !== null
+    let next: number | null = null
+    switch (event.key) {
+        case 'ArrowRight':
+            next = isRtl ? index - 1 : index + 1
+            break
+        case 'ArrowLeft':
+            next = isRtl ? index + 1 : index - 1
+            break
+        case 'Home':
+            next = 0
+            break
+        case 'End':
+            next = count - 1
+            break
+        default:
+            return
+    }
+    event.preventDefault()
+    next = (next + count) % count
+    activeTab.value = tabs.value[next].key
+    tabRefs.value[next]?.focus()
+}
+
 // Get current relation manager
 const currentRelationManager = computed(() => {
     return props.relationManagers.find(rm => rm.relationship === activeTab.value)
@@ -64,13 +97,19 @@ const currentRelationManager = computed(() => {
     <div v-if="relationManagers && relationManagers.length > 0" class="relation-managers mt-8">
         <!-- Tabs Header -->
         <div class="border-b">
-            <nav class="flex space-x-4 overflow-x-auto" aria-label="Relation Tabs">
+            <div class="flex space-x-4 overflow-x-auto" role="tablist" aria-label="Relation Tabs">
                 <button
-                    v-for="tab in tabs"
+                    v-for="(tab, index) in tabs"
                     :key="tab.key"
+                    :ref="(el) => { if (el) tabRefs[index] = el as HTMLButtonElement }"
                     type="button"
+                    role="tab"
+                    :id="tabId(tab.key)"
+                    :aria-selected="activeTab === tab.key ? 'true' : 'false'"
+                    :aria-controls="tabPanelId(tab.key)"
+                    :tabindex="activeTab === tab.key ? 0 : -1"
                     @click="activeTab = tab.key"
-                    :aria-current="activeTab === tab.key ? 'true' : undefined"
+                    @keydown="onTabKeydown($event, index)"
                     :class="[
                         'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                         activeTab === tab.key
@@ -85,11 +124,18 @@ const currentRelationManager = computed(() => {
                     />
                     {{ tab.label }}
                 </button>
-            </nav>
+            </div>
         </div>
 
         <!-- Tab Content -->
-        <div class="py-6">
+        <div
+            v-if="currentRelationManager"
+            class="py-6"
+            role="tabpanel"
+            :id="tabPanelId(currentRelationManager.relationship)"
+            :aria-labelledby="tabId(currentRelationManager.relationship)"
+            tabindex="0"
+        >
             <RelationManager
                 v-if="currentRelationManager"
                 :key="currentRelationManager.relationship"

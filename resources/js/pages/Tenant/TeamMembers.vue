@@ -314,7 +314,7 @@ const layoutProps = {
                                     size="icon"
                                     class="text-destructive hover:text-destructive"
                                     @click="confirmRemoveMember(member)"
-                                    :aria-label="trans('panel::panel.tenancy.settings.remove')"
+                                    :aria-label="trans('panel::panel.tenancy.settings.remove_member', { name: member.name })"
                                 >
                                     <Trash2 class="h-4 w-4" />
                                 </Button>

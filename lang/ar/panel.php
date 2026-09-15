@@ -376,6 +376,7 @@ return [
             'role' => 'الدور',
             'owner' => 'المالك',
             'remove' => 'إزالة',
+            'remove_member' => 'إزالة :name',
             'remove_member_title' => 'إزالة عضو من الفريق',
             'remove_member_description' => 'هل أنت متأكد من إزالة :name من الفريق؟',
             'leave_team' => 'مغادرة الفريق',

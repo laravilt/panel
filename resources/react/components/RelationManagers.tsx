@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { resolveIcon } from '@laravilt/support/lib/icons';
 import RelationManager from './RelationManager';
@@ -26,7 +26,7 @@ export interface RelationManagersProps {
     panelId: string;
 }
 
-export default function RelationManagers({ relationManagers, ownerRecordId, resourceSlug, panelId }: RelationManagersProps) {
+export default function RelationManagers({ relationManagers, ownerRecordId, resourceSlug, panelId: panelIdProp }: RelationManagersProps) {
     // Active tab state
     const [activeTab, setActiveTab] = useState<string>(relationManagers[0]?.relationship || '');
 
@@ -36,6 +36,39 @@ export default function RelationManagers({ relationManagers, ownerRecordId, reso
         label: rm.pluralLabel,
         icon: rm.icon,
     }));
+
+    // Tabs a11y: ids, roving tabindex and arrow-key navigation
+    const tabsId = `relation-managers-${resourceSlug}-${ownerRecordId}`;
+    const tabId = (key: string) => `${tabsId}-tab-${key}`;
+    const panelId = (key: string) => `${tabsId}-panel-${key}`;
+    const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+    const onTabKeydown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+        const count = tabs.length;
+        if (count === 0) return;
+        const isRtl = event.currentTarget.closest('[dir="rtl"]') !== null;
+        let next: number;
+        switch (event.key) {
+            case 'ArrowRight':
+                next = isRtl ? index - 1 : index + 1;
+                break;
+            case 'ArrowLeft':
+                next = isRtl ? index + 1 : index - 1;
+                break;
+            case 'Home':
+                next = 0;
+                break;
+            case 'End':
+                next = count - 1;
+                break;
+            default:
+                return;
+        }
+        event.preventDefault();
+        next = (next + count) % count;
+        setActiveTab(tabs[next].key);
+        tabRefs.current[next]?.focus();
+    };
 
     // Current relation manager
     const currentRelationManager = relationManagers.find((rm) => rm.relationship === activeTab);
@@ -48,16 +81,24 @@ export default function RelationManagers({ relationManagers, ownerRecordId, reso
         <div className="relation-managers mt-8">
             {/* Tabs Header */}
             <div className="border-b">
-                <nav className="flex space-x-4 overflow-x-auto" aria-label="Relation Tabs">
-                    {tabs.map((tab) => {
+                <div className="flex space-x-4 overflow-x-auto" role="tablist" aria-label="Relation Tabs">
+                    {tabs.map((tab, index) => {
                         const TabIcon = tab.icon ? resolveIcon(tab.icon) : null;
 
                         return (
                             <button
                                 key={tab.key}
+                                ref={(el) => {
+                                    tabRefs.current[index] = el;
+                                }}
                                 type="button"
+                                role="tab"
+                                id={tabId(tab.key)}
+                                aria-selected={activeTab === tab.key}
+                                aria-controls={panelId(tab.key)}
+                                tabIndex={activeTab === tab.key ? 0 : -1}
                                 onClick={() => setActiveTab(tab.key)}
-                                aria-current={activeTab === tab.key ? 'true' : undefined}
+                                onKeyDown={(event) => onTabKeydown(event, index)}
                                 className={cn(
                                     'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                                     activeTab === tab.key
@@ -70,12 +111,18 @@ export default function RelationManagers({ relationManagers, ownerRecordId, reso
                             </button>
                         );
                     })}
-                </nav>
+                </div>
             </div>
 
             {/* Tab Content */}
-            <div className="py-6">
-                {currentRelationManager && (
+            {currentRelationManager && (
+                <div
+                    className="py-6"
+                    role="tabpanel"
+                    id={panelId(currentRelationManager.relationship)}
+                    aria-labelledby={tabId(currentRelationManager.relationship)}
+                    tabIndex={0}
+                >
                     <RelationManager
                         key={currentRelationManager.relationship}
                         relationship={currentRelationManager.relationship}
@@ -93,10 +140,10 @@ export default function RelationManagers({ relationManagers, ownerRecordId, reso
                         headerActions={currentRelationManager.headerActions}
                         ownerRecordId={ownerRecordId}
                         resourceSlug={resourceSlug}
-                        panelId={panelId}
+                        panelId={panelIdProp}
                     />
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
