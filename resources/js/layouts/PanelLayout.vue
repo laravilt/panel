@@ -47,12 +47,62 @@ const loadPanelFont = () => {
     }
 };
 
+// Panel custom assets (Panel::customCss() / customJs())
+const ASSET_ATTRIBUTE = 'data-laravilt-asset';
+
+const syncPanelAssets = () => {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const wanted = new Map<string, { type: 'css' | 'js'; url: string }>();
+    const collect = (urls: unknown, type: 'css' | 'js') => {
+        if (!Array.isArray(urls)) {
+            return;
+        }
+        for (const url of urls) {
+            if (typeof url === 'string' && url !== '') {
+                wanted.set(`${type}:${url}`, { type, url });
+            }
+        }
+    };
+    collect(panelData.value?.customCss, 'css');
+    collect(panelData.value?.customJs, 'js');
+
+    // Remove assets that are no longer configured and keep the ones already injected
+    document.head.querySelectorAll(`[${ASSET_ATTRIBUTE}]`).forEach((element) => {
+        const key = element.getAttribute(ASSET_ATTRIBUTE) ?? '';
+        if (wanted.has(key)) {
+            wanted.delete(key);
+        } else {
+            element.remove();
+        }
+    });
+
+    wanted.forEach(({ type, url }, key) => {
+        let element: HTMLLinkElement | HTMLScriptElement;
+        if (type === 'css') {
+            element = document.createElement('link');
+            element.rel = 'stylesheet';
+            element.href = url;
+        } else {
+            element = document.createElement('script');
+            element.src = url;
+            element.defer = true;
+        }
+        element.setAttribute(ASSET_ATTRIBUTE, key);
+        document.head.appendChild(element);
+    });
+};
+
 onMounted(() => {
     loadPanelFont();
+    syncPanelAssets();
 });
 
 watch(panelData, () => {
     loadPanelFont();
+    syncPanelAssets();
 });
 </script>
 

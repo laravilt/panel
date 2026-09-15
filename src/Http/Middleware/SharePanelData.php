@@ -45,6 +45,9 @@ class SharePanelData
                     'currentLocale' => $request->user()?->locale ?? config('app.locale', 'en'),
                     'font' => $panel->getFontData(),
                     'hasDarkMode' => $panel->hasDarkMode(),
+                    // Custom assets injected into <head> by the panel layout
+                    'customCss' => $this->resolveAssetUrls($panel->getCustomCss()),
+                    'customJs' => $this->resolveAssetUrls($panel->getCustomJs()),
                     // Global search config
                     'hasGlobalSearch' => $panel->hasGlobalSearch(),
                     'globalSearchEndpoint' => $panel->hasGlobalSearch() ? $panel->getGlobalSearchEndpoint() : null,
@@ -62,6 +65,21 @@ class SharePanelData
         }
 
         return $next($request);
+    }
+
+    /**
+     * Resolve custom asset entries to URLs: absolute and root-relative URLs are kept, anything else goes through asset().
+     *
+     * @return array<int, string>
+     */
+    protected function resolveAssetUrls(array $files): array
+    {
+        return collect($files)
+            ->filter(fn ($file) => is_string($file) && trim($file) !== '')
+            ->map(fn (string $file) => preg_match('#^([a-z][a-z0-9+.\-]*:|/)#i', $file) ? $file : asset($file))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**
