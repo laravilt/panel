@@ -91,7 +91,7 @@ class MakePageCommand extends Command
         $this->createPageClass($panel, $name);
 
         // Create the view file for the application's frontend stack
-        $react = Frontend::isReact();
+        $react = class_exists(Frontend::class) && Frontend::isReact();
 
         $react
             ? $this->createReactViewFile($panel, $name)

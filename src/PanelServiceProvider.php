@@ -108,7 +108,7 @@ class PanelServiceProvider extends ServiceProvider
         ], 'laravilt-panel-lang');
 
         // Frontend sources follow the application's stack (resources/js = Vue, resources/react = React)
-        $frontend = Frontend::resourceDirectory();
+        $frontend = class_exists(Frontend::class) ? Frontend::resourceDirectory() : 'js';
         $stubs = $frontend === 'react' ? __DIR__.'/../stubs/react' : __DIR__.'/../stubs';
 
         // Publish frontend views/pages
