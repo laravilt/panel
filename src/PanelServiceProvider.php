@@ -44,8 +44,6 @@ use Laravilt\Panel\Resources\NestedResource;
 use Laravilt\Panel\Tenancy\MultiDatabaseManager;
 use Laravilt\Support\Frontend;
 use Laravilt\Tables\ApiResource;
-use Laravilt\Tables\Columns\ToggleColumn;
-use Laravilt\Tables\Table;
 
 class PanelServiceProvider extends ServiceProvider
 {
@@ -721,57 +719,10 @@ class PanelServiceProvider extends ServiceProvider
      */
     protected function registerColumnUpdateRoute(string $resourceClass, string $slug, string $modelClass, Panel $panel): void
     {
-        Route::patch($slug.'/{id}/column', function () use ($resourceClass, $modelClass) {
-            // Use named route parameter to handle subdomain routes where {tenant} is also a parameter
-            $id = request()->route('id');
-            $record = $modelClass::findOrFail($id);
-            $column = request()->input('column');
-            $value = request()->input('value');
-
-            // Validate input
-            if (empty($column)) {
-                return back()->withErrors(['column' => 'Column name is required.']);
-            }
-
-            // Get the table configuration to find the column and its callbacks
-            $table = new Table;
-            $table = $resourceClass::table($table);
-            $columns = $table->getColumns();
-
-            // Find the column configuration
-            $columnConfig = null;
-            foreach ($columns as $col) {
-                if ($col->getName() === $column) {
-                    $columnConfig = $col;
-                    break;
-                }
-            }
-
-            // Check if column exists and is editable
-            if (! $columnConfig) {
-                return back()->withErrors([$column => 'Column not found.']);
-            }
-
-            // Execute beforeStateUpdated callback if exists
-            if ($columnConfig instanceof ToggleColumn) {
-                $beforeCallback = $columnConfig->getBeforeStateUpdated();
-                if ($beforeCallback) {
-                    $beforeCallback($record, $column, $value);
-                }
-            }
-
-            // Update the record
-            $record->update([$column => $value]);
-
-            // Execute afterStateUpdated callback if exists
-            if ($columnConfig instanceof ToggleColumn) {
-                $afterCallback = $columnConfig->getAfterStateUpdated();
-                if ($afterCallback) {
-                    $afterCallback($record, $column, $value);
-                }
-            }
-
-            return back();
+        // Only editable, non-disabled columns of the resource table can be written, on a tenant-scoped record the
+        // user may update, with the column's validation rules (see ColumnStateController)
+        Route::patch($slug.'/{id}/column', function () use ($resourceClass) {
+            return app(Http\Controllers\ColumnStateController::class)->updateResourceColumn(request(), $resourceClass);
         })->name('resources.'.$slug.'.column.update');
     }
 
@@ -1082,50 +1033,10 @@ class PanelServiceProvider extends ServiceProvider
         })->name('resources.'.$slug.'.relations.bulk-delete');
 
         // Route: PATCH /{slug}/{id}/relations/{relationship}/{relationId}/column - Update single column (for toggle columns)
-        Route::patch($slug.'/{id}/relations/{relationship}/{relationId}/column', function () use ($resourceClass, $modelClass) {
-            // Use named route parameters to handle subdomain routes where {tenant} is also a parameter
-            $id = request()->route('id');
-            $relationship = request()->route('relationship');
-            $relationId = request()->route('relationId');
-            $record = $modelClass::findOrFail($id);
-
-            // Find the relation manager class
-            $relationManagers = $resourceClass::getRelations();
-            $relationManagerClass = null;
-
-            foreach ($relationManagers as $rmClass) {
-                if ($rmClass::getRelationship() === $relationship) {
-                    $relationManagerClass = $rmClass;
-                    break;
-                }
-            }
-
-            if (! $relationManagerClass) {
-                if (request()->wantsJson()) {
-                    return response()->json(['error' => 'Relation manager not found'], 404);
-                }
-
-                return back()->withErrors(['error' => 'Relation manager not found']);
-            }
-
-            // Find and update the related record's column
-            $relatedRecord = $record->{$relationship}()->findOrFail($relationId);
-            $column = request()->input('column');
-            $value = request()->input('value');
-
-            if ($column) {
-                $relatedRecord->update([$column => $value]);
-            }
-
-            // Return JSON for AJAX requests, redirect for Inertia
-            if (request()->wantsJson() && ! request()->header('X-Inertia')) {
-                return response()->json([
-                    'success' => true,
-                    'data' => $relatedRecord,
-                ]);
-            }
-
-            return back();
+        // Only editable, non-disabled columns of the relation manager's table can be written, on a related record of
+        // the tenant-scoped owner, when the user may edit it (see ColumnStateController)
+        Route::patch($slug.'/{id}/relations/{relationship}/{relationId}/column', function () use ($resourceClass) {
+            return app(Http\Controllers\ColumnStateController::class)->updateRelationColumn(request(), $resourceClass);
         })->name('resources.'.$slug.'.relations.column');
     }
 
