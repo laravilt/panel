@@ -236,7 +236,7 @@ export default function TeamProfile({
                                                 onClick={selectAvatar}
                                                 disabled={!permissions.canUpdateTeam}
                                             >
-                                                <Upload className="h-4 w-4 mr-2" />
+                                                <Upload className="h-4 w-4 me-2" />
                                                 {trans('panel::panel.tenancy.settings.upload_avatar')}
                                             </Button>
                                             {avatarPreview && (
@@ -247,7 +247,7 @@ export default function TeamProfile({
                                                     onClick={removeAvatar}
                                                     disabled={!permissions.canUpdateTeam}
                                                 >
-                                                    <X className="h-4 w-4 mr-2" />
+                                                    <X className="h-4 w-4 me-2" />
                                                     {trans('panel::panel.tenancy.settings.remove_avatar')}
                                                 </Button>
                                             )}
@@ -353,7 +353,7 @@ export default function TeamProfile({
                                 <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                                     <DialogTrigger asChild>
                                         <Button variant="destructive">
-                                            <Trash2 className="h-4 w-4 mr-2" />
+                                            <Trash2 className="h-4 w-4 me-2" />
                                             {trans('panel::panel.tenancy.settings.delete_team')}
                                         </Button>
                                     </DialogTrigger>

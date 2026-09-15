@@ -391,6 +391,7 @@ return [
             'role' => 'Role',
             'owner' => 'Owner',
             'remove' => 'Remove',
+            'remove_member' => 'Remove :name',
             'remove_member_title' => 'Remove Team Member',
             'remove_member_description' => 'Are you sure you want to remove :name from the team?',
             'leave_team' => 'Leave Team',

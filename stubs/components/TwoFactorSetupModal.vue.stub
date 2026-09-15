@@ -214,8 +214,10 @@ watch(
                                         class="h-full w-full bg-background p-3 text-foreground"
                                     />
                                     <button
+                                        type="button"
                                         @click="copy(manualSetupKey || '')"
-                                        class="relative block h-auto border-l border-border px-3 hover:bg-muted"
+                                        aria-label="Copy setup key"
+                                        class="relative block h-auto border-s border-border px-3 hover:bg-muted"
                                     >
                                         <Check
                                             v-if="copied"

@@ -201,7 +201,7 @@ function shouldAnimate(title: string): boolean {
                                     <Badge
                                         v-if="subItem.badge || subItem.badgeCount"
                                         :variant="getBadgeVariant(subItem.badgeColor)"
-                                        class="h-5 min-w-5 px-1.5 text-xs ml-auto me-1"
+                                        class="h-5 min-w-5 px-1.5 text-xs ms-auto me-1"
                                     >
                                         {{ subItem.badge || subItem.badgeCount }}
                                     </Badge>
@@ -248,7 +248,7 @@ function shouldAnimate(title: string): boolean {
                                             <Badge
                                                 v-if="subItem.badge || subItem.badgeCount"
                                                 :variant="getBadgeVariant(subItem.badgeColor)"
-                                                class="h-5 min-w-5 px-1.5 text-xs ml-auto me-1"
+                                                class="h-5 min-w-5 px-1.5 text-xs ms-auto me-1"
                                             >
                                                 {{ subItem.badge || subItem.badgeCount }}
                                             </Badge>

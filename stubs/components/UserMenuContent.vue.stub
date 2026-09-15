@@ -77,7 +77,7 @@ const handleMenuItemClick = (item: MenuItem) => {
 
 <template>
     <DropdownMenuLabel class="p-0 font-normal">
-        <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm rtl:flex-row-reverse">
+        <div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
             <UserInfo :user="user" :show-email="true" />
         </div>
     </DropdownMenuLabel>
@@ -86,7 +86,7 @@ const handleMenuItemClick = (item: MenuItem) => {
     <!-- Appearance submenu -->
     <DropdownMenuGroup>
         <DropdownMenuSub>
-            <DropdownMenuSubTrigger class="rtl:flex-row-reverse">
+            <DropdownMenuSubTrigger>
                 <Palette class="h-4 w-4" />
                 {{ trans('laravilt-panel::panel.appearance.title') }}
             </DropdownMenuSubTrigger>
@@ -95,7 +95,7 @@ const handleMenuItemClick = (item: MenuItem) => {
                     v-for="option in appearanceOptions"
                     :key="option.value"
                     @click="updateAppearance(option.value)"
-                    class="gap-2 rtl:flex-row-reverse"
+                    class="gap-2"
                 >
                     <component :is="option.Icon" class="h-4 w-4" />
                     {{ option.label }}
@@ -114,7 +114,6 @@ const handleMenuItemClick = (item: MenuItem) => {
             <DropdownMenuItem
                 v-if="item.method === 'post'"
                 as-child
-                class="rtl:flex-row-reverse"
             >
                 <button
                     class="w-full"
@@ -133,7 +132,6 @@ const handleMenuItemClick = (item: MenuItem) => {
             <DropdownMenuItem
                 v-else
                 :as-child="true"
-                class="rtl:flex-row-reverse"
             >
                 <Link
                     class="block w-full"

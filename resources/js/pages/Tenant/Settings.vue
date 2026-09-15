@@ -179,7 +179,7 @@ const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' 
         <div class="container max-w-4xl py-6 space-y-6">
             <!-- Header -->
             <div class="flex items-center gap-4">
-                <Button variant="ghost" size="icon" @click="goBack">
+                <Button variant="ghost" size="icon" @click="goBack" :aria-label="trans('panel::panel.common.back')">
                     <ArrowLeft class="h-4 w-4" />
                 </Button>
                 <div>
@@ -241,7 +241,7 @@ const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' 
                         <Dialog v-model:open="showAddMemberDialog">
                             <DialogTrigger as-child>
                                 <Button v-if="permissions.canAddTeamMembers" size="sm">
-                                    <UserPlus class="h-4 w-4 mr-2" />
+                                    <UserPlus class="h-4 w-4 me-2" />
                                     {{ trans('panel::panel.tenancy.settings.add_member') }}
                                 </Button>
                             </DialogTrigger>
@@ -353,6 +353,7 @@ const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' 
                                         size="icon"
                                         class="text-destructive hover:text-destructive"
                                         @click="confirmRemoveMember(member)"
+                                        :aria-label="trans('panel::panel.tenancy.settings.remove')"
                                     >
                                         <Trash2 class="h-4 w-4" />
                                     </Button>
@@ -397,7 +398,7 @@ const getRoleBadgeVariant = (role: string): 'default' | 'secondary' | 'outline' 
                     <Dialog v-model:open="showDeleteDialog">
                         <DialogTrigger as-child>
                             <Button variant="destructive">
-                                <Trash2 class="h-4 w-4 mr-2" />
+                                <Trash2 class="h-4 w-4 me-2" />
                                 {{ trans('panel::panel.tenancy.settings.delete_team') }}
                             </Button>
                         </DialogTrigger>

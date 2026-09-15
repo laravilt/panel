@@ -47,6 +47,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const page = usePage();
 const auth = computed(() => page.props.auth);
+const isRtl = computed(() => (page.props as any).localization?.isRtl ?? false);
 
 const isCurrentRoute = computed(
     () => (url: NonNullable<InertiaLinkProps['href']>) =>
@@ -93,16 +94,17 @@ const rightNavItems: NavItem[] = [
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                class="mr-2 h-9 w-9"
+                                class="me-2 h-9 w-9"
                             >
                                 <Menu class="h-5 w-5" />
+                                <span class="sr-only">Open navigation menu</span>
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="left" class="w-[300px] p-6">
+                        <SheetContent :side="isRtl ? 'right' : 'left'" class="w-[300px] p-6">
                             <SheetTitle class="sr-only"
                                 >Navigation Menu</SheetTitle
                             >
-                            <SheetHeader class="flex justify-start text-left">
+                            <SheetHeader class="flex justify-start text-start">
                                 <AppLogoIcon
                                     class="size-7"
                                 />
@@ -154,13 +156,13 @@ const rightNavItems: NavItem[] = [
 
                 <!-- Desktop Menu -->
                 <div class="hidden h-full lg:flex lg:flex-1">
-                    <NavigationMenu class="ml-10 flex h-full items-stretch">
+                    <NavigationMenu class="ms-10 flex h-full items-stretch">
                         <NavigationMenuList
                             class="flex h-full items-stretch space-x-2"
                         >
                             <NavigationMenuItem
-                                v-for="(item, index) in mainNavItems"
-                                :key="index"
+                                v-for="item in mainNavItems"
+                                :key="item.title"
                                 class="relative flex h-full items-center"
                             >
                                 <Link
@@ -174,20 +176,20 @@ const rightNavItems: NavItem[] = [
                                     <component
                                         v-if="item.icon"
                                         :is="item.icon"
-                                        class="mr-2 h-4 w-4"
+                                        class="me-2 h-4 w-4"
                                     />
                                     {{ item.title }}
                                 </Link>
                                 <div
                                     v-if="isCurrentRoute(item.href)"
-                                    class="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"
+                                    class="absolute bottom-0 start-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"
                                 ></div>
                             </NavigationMenuItem>
                         </NavigationMenuList>
                     </NavigationMenu>
                 </div>
 
-                <div class="ml-auto flex items-center space-x-2">
+                <div class="ms-auto flex items-center space-x-2">
                     <div class="relative flex items-center space-x-1">
                         <Button
                             variant="ghost"
@@ -197,6 +199,7 @@ const rightNavItems: NavItem[] = [
                             <Search
                                 class="size-5 opacity-80 group-hover:opacity-100"
                             />
+                            <span class="sr-only">Search</span>
                         </Button>
 
                         <div class="hidden space-x-1 lg:flex">
@@ -206,7 +209,7 @@ const rightNavItems: NavItem[] = [
                             >
                                 <TooltipProvider :delay-duration="0">
                                     <Tooltip>
-                                        <TooltipTrigger>
+                                        <TooltipTrigger as-child>
                                             <Button
                                                 variant="ghost"
                                                 size="icon"
@@ -243,6 +246,7 @@ const rightNavItems: NavItem[] = [
                                 variant="ghost"
                                 size="icon"
                                 class="relative size-10 w-auto rounded-full p-1 focus-within:ring-2 focus-within:ring-primary"
+                                aria-label="Open user menu"
                             >
                                 <Avatar
                                     class="size-8 overflow-hidden rounded-full"

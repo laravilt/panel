@@ -37,7 +37,7 @@ export function NavUser({ user: userProp }: { user?: User } = {}) {
                             data-test="sidebar-menu-button"
                         >
                             <UserInfo user={user} />
-                            <ChevronsUpDown className="ml-auto size-4" />
+                            <ChevronsUpDown className="ms-auto size-4" />
                         </SidebarMenuButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent

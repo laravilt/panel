@@ -12,6 +12,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import type { User } from '@/types';
 import { resolveIcon } from '@laravilt/support/lib/icons';
 import AppLogoIcon from './AppLogoIcon';
 import TenantSwitcher from './TenantSwitcher';
@@ -72,7 +73,7 @@ const getIconComponent = (iconName: string | null | undefined): LucideIcon => {
     return resolveIcon(iconName) ?? LayoutGrid;
 };
 
-export default function PanelSidebar({ navigation, panel: panelProp, children }: PanelSidebarProps) {
+export default function PanelSidebar({ navigation, panel: panelProp, user, children }: PanelSidebarProps) {
     // Support prop-based panel data
     const panel: Record<string, any> = panelProp || {};
 
@@ -147,7 +148,8 @@ export default function PanelSidebar({ navigation, panel: panelProp, children }:
                 </SidebarContent>
 
                 <SidebarFooter>
-                    <NavUser />
+                    {/* Vue passes `:user="user"`; NavUser falls back to it when no panel/auth user is shared. */}
+                    <NavUser user={user as User | undefined} />
                 </SidebarFooter>
             </Sidebar>
             {children}

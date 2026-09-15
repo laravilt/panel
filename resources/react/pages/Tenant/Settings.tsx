@@ -169,7 +169,7 @@ export default function Settings({ panel, team, members, availableRoles, permiss
             <div className="container max-w-4xl py-6 space-y-6">
                 {/* Header */}
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={goBack}>
+                    <Button variant="ghost" size="icon" onClick={goBack} aria-label={trans('panel::panel.common.back')}>
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
@@ -226,7 +226,7 @@ export default function Settings({ panel, team, members, availableRoles, permiss
                                 {permissions.canAddTeamMembers && (
                                     <DialogTrigger asChild>
                                         <Button size="sm">
-                                            <UserPlus className="h-4 w-4 mr-2" />
+                                            <UserPlus className="h-4 w-4 me-2" />
                                             {trans('panel::panel.tenancy.settings.add_member')}
                                         </Button>
                                     </DialogTrigger>
@@ -332,6 +332,7 @@ export default function Settings({ panel, team, members, availableRoles, permiss
                                                         size="icon"
                                                         className="text-destructive hover:text-destructive"
                                                         onClick={() => confirmRemoveMember(member)}
+                                                        aria-label={trans('panel::panel.tenancy.settings.remove')}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>
@@ -378,7 +379,7 @@ export default function Settings({ panel, team, members, availableRoles, permiss
                             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                                 <DialogTrigger asChild>
                                     <Button variant="destructive">
-                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        <Trash2 className="h-4 w-4 me-2" />
                                         {trans('panel::panel.tenancy.settings.delete_team')}
                                     </Button>
                                 </DialogTrigger>

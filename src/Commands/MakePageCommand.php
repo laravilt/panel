@@ -5,6 +5,8 @@ namespace Laravilt\Panel\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Laravilt\Panel\Pages\Dashboard;
+use Laravilt\Panel\Pages\Page;
 use Laravilt\Support\Frontend;
 
 use function Laravel\Prompts\multiselect;
@@ -159,15 +161,10 @@ class MakePageCommand extends Command
 
         $imports = $this->buildPageImports();
         $traits = $this->buildPageTraits();
-        $properties = $this->buildPageProperties($slug, $title);
+        $properties = $this->buildPageProperties($slug, $title, "{$panel}/{$name}");
         $methods = $this->buildPageMethods();
 
-        $baseClass = match ($this->pageType) {
-            'form' => 'SettingsPage',
-            'table' => 'ListRecords',
-            'dashboard' => 'Dashboard',
-            default => 'Page',
-        };
+        $baseClass = class_basename($this->getBaseClass());
 
         return <<<PHP
 <?php
@@ -180,6 +177,29 @@ class {$name} extends {$baseClass}
 {{$traits}{$properties}{$methods}
 }
 PHP;
+    }
+
+    /**
+     * Get the base class for the selected page type.
+     *
+     * Form and table pages are standalone custom pages: they extend Page (which already
+     * implements HasForms) and render their own generated view. Resource page classes such
+     * as ListRecords require a resource and can't be used here.
+     */
+    protected function getBaseClass(): string
+    {
+        return static::baseClassFor($this->pageType);
+    }
+
+    /**
+     * Map a page type to its base class.
+     */
+    public static function baseClassFor(string $type): string
+    {
+        return match ($type) {
+            'dashboard' => Dashboard::class,
+            default => Page::class,
+        };
     }
 
     /**
@@ -225,12 +245,14 @@ PHP;
     /**
      * Build page properties.
      */
-    protected function buildPageProperties(string $slug, string $title): string
+    protected function buildPageProperties(string $slug, string $title, string $view): string
     {
         $properties = [
             "    protected static ?string \$navigationIcon = 'File';",
             "    protected static ?string \$navigationLabel = '{$title}';",
             "    protected static ?string \$slug = '{$slug}';",
+            // Render the view generated alongside this class (resources/js/pages/{Panel}/{Name})
+            "    protected static string \$view = '{$view}';",
         ];
 
         if ($this->pageType === 'dashboard') {
@@ -255,7 +277,9 @@ PHP;
         return [
             Action::make('save')
                 ->label('Save')
-                ->action(fn () => $this->save()),
+                ->action(function () {
+                    // Handle the action here
+                }),
         ];
     }
 PHP;
@@ -293,8 +317,8 @@ PHP;
     public function getBreadcrumbs(): array
     {
         return [
-            '/' => 'Home',
-            '#' => $this->getTitle(),
+            ['label' => __('laravilt-panel::panel.navigation.dashboard'), 'url' => $this->getPanel()->url()],
+            ['label' => static::getTitle(), 'url' => null],
         ];
     }
 PHP;

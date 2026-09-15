@@ -221,7 +221,7 @@ const layoutProps = {
                                         @click="selectAvatar"
                                         :disabled="!permissions.canUpdateTeam"
                                     >
-                                        <Upload class="h-4 w-4 mr-2" />
+                                        <Upload class="h-4 w-4 me-2" />
                                         {{ trans('panel::panel.tenancy.settings.upload_avatar') }}
                                     </Button>
                                     <Button
@@ -232,7 +232,7 @@ const layoutProps = {
                                         @click="removeAvatar"
                                         :disabled="!permissions.canUpdateTeam"
                                     >
-                                        <X class="h-4 w-4 mr-2" />
+                                        <X class="h-4 w-4 me-2" />
                                         {{ trans('panel::panel.tenancy.settings.remove_avatar') }}
                                     </Button>
                                 </div>
@@ -325,7 +325,7 @@ const layoutProps = {
                     <Dialog v-model:open="showDeleteDialog">
                         <DialogTrigger as-child>
                             <Button variant="destructive">
-                                <Trash2 class="h-4 w-4 mr-2" />
+                                <Trash2 class="h-4 w-4 me-2" />
                                 {{ trans('panel::panel.tenancy.settings.delete_team') }}
                             </Button>
                         </DialogTrigger>

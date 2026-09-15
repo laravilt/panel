@@ -64,6 +64,7 @@ export default function SettingsLayout({
                                     key={item.href}
                                     href={item.href}
                                     data-slot="button"
+                                    aria-current={item.active ? 'page' : undefined}
                                     className={cn(
                                         'inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all',
                                         'disabled:pointer-events-none disabled:opacity-50',
