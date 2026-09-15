@@ -57,6 +57,7 @@ export default function RelationManagers({ relationManagers, ownerRecordId, reso
                                 key={tab.key}
                                 type="button"
                                 onClick={() => setActiveTab(tab.key)}
+                                aria-current={activeTab === tab.key ? 'true' : undefined}
                                 className={cn(
                                     'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                                     activeTab === tab.key

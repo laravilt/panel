@@ -70,6 +70,7 @@ const currentRelationManager = computed(() => {
                     :key="tab.key"
                     type="button"
                     @click="activeTab = tab.key"
+                    :aria-current="activeTab === tab.key ? 'true' : undefined"
                     :class="[
                         'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap',
                         activeTab === tab.key

@@ -113,7 +113,7 @@ const submit = () => {
                                     v-model="form.subdomain"
                                     type="text"
                                     :placeholder="trans('panel::panel.tenancy.subdomain_placeholder')"
-                                    class="pr-2"
+                                    class="pe-2"
                                     required
                                     @input="onSubdomainInput"
                                 />

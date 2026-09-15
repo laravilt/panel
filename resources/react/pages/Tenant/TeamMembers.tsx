@@ -309,6 +309,7 @@ export default function TeamMembers({
                                                         size="icon"
                                                         className="text-destructive hover:text-destructive"
                                                         onClick={() => confirmRemoveMember(member)}
+                                                        aria-label={trans('panel::panel.tenancy.settings.remove')}
                                                     >
                                                         <Trash2 className="h-4 w-4" />
                                                     </Button>

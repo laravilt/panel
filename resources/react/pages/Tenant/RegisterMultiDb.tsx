@@ -120,7 +120,7 @@ export default function RegisterMultiDb({ panel, baseDomain, reservedSubdomains 
                                             }}
                                             type="text"
                                             placeholder={trans('panel::panel.tenancy.subdomain_placeholder')}
-                                            className="pr-2"
+                                            className="pe-2"
                                             required
                                         />
                                     </div>

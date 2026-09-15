@@ -83,7 +83,7 @@ export function UserMenuContent({ user }: Props) {
     return (
         <>
             <DropdownMenuLabel className="p-0 font-normal">
-                <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm rtl:flex-row-reverse">
+                <div className="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
                     <UserInfo user={user} showEmail={true} />
                 </div>
             </DropdownMenuLabel>
@@ -92,7 +92,7 @@ export function UserMenuContent({ user }: Props) {
             {/* Appearance submenu */}
             <DropdownMenuGroup>
                 <DropdownMenuSub>
-                    <DropdownMenuSubTrigger className="rtl:flex-row-reverse">
+                    <DropdownMenuSubTrigger>
                         <Palette className="h-4 w-4" />
                         {trans('laravilt-panel::panel.appearance.title')}
                     </DropdownMenuSubTrigger>
@@ -101,7 +101,7 @@ export function UserMenuContent({ user }: Props) {
                             <DropdownMenuItem
                                 key={option.value}
                                 onClick={() => updateAppearance(option.value)}
-                                className="gap-2 rtl:flex-row-reverse"
+                                className="gap-2"
                             >
                                 <option.Icon className="h-4 w-4" />
                                 {option.label}
@@ -128,7 +128,6 @@ export function UserMenuContent({ user }: Props) {
                                 {item.method === 'post' ? (
                                     <DropdownMenuItem
                                         asChild
-                                        className="rtl:flex-row-reverse"
                                     >
                                         <button
                                             className="w-full"
@@ -153,7 +152,6 @@ export function UserMenuContent({ user }: Props) {
                                 ) : (
                                     <DropdownMenuItem
                                         asChild
-                                        className="rtl:flex-row-reverse"
                                     >
                                         <Link
                                             className="block w-full"

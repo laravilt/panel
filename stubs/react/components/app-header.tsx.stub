@@ -66,6 +66,7 @@ const rightNavItems: NavItem[] = [
 export function AppHeader({ breadcrumbs = [] }: Props) {
     const page = usePage();
     const { auth } = page.props;
+    const isRtl = page.props.localization?.isRtl ?? false;
     const getInitials = useInitials();
 
     const isCurrentRoute = (url: NonNullable<InertiaLinkProps['href']>) =>
@@ -87,19 +88,22 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="mr-2 h-[34px] w-[34px]"
+                                    className="me-2 h-[34px] w-[34px]"
                                 >
                                     <Menu className="h-5 w-5" />
+                                    <span className="sr-only">
+                                        Open navigation menu
+                                    </span>
                                 </Button>
                             </SheetTrigger>
                             <SheetContent
-                                side="left"
+                                side={isRtl ? 'right' : 'left'}
                                 className="flex h-full w-64 flex-col items-stretch justify-between bg-sidebar"
                             >
                                 <SheetTitle className="sr-only">
                                     Navigation menu
                                 </SheetTitle>
-                                <SheetHeader className="flex justify-start text-left">
+                                <SheetHeader className="flex justify-start text-start">
                                     <AppLogoIcon className="size-7" />
                                 </SheetHeader>
                                 <div className="flex h-full flex-1 flex-col space-y-4 p-4">
@@ -155,12 +159,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                     </Link>
 
                     {/* Desktop Navigation */}
-                    <div className="ml-6 hidden h-full items-center space-x-6 lg:flex">
+                    <div className="ms-6 hidden h-full items-center space-x-6 lg:flex">
                         <NavigationMenu className="flex h-full items-stretch">
                             <NavigationMenuList className="flex h-full items-stretch space-x-2">
-                                {mainNavItems.map((item, index) => (
+                                {mainNavItems.map((item) => (
                                     <NavigationMenuItem
-                                        key={index}
+                                        key={item.title}
                                         className="relative flex h-full items-center"
                                     >
                                         <Link
@@ -172,12 +176,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                             )}
                                         >
                                             {item.icon && (
-                                                <item.icon className="mr-2 h-4 w-4" />
+                                                <item.icon className="me-2 h-4 w-4" />
                                             )}
                                             {item.title}
                                         </Link>
                                         {isCurrentRoute(item.href) && (
-                                            <div className="absolute bottom-0 left-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
+                                            <div className="absolute bottom-0 start-0 h-0.5 w-full translate-y-px bg-black dark:bg-white"></div>
                                         )}
                                     </NavigationMenuItem>
                                 ))}
@@ -185,7 +189,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                         </NavigationMenu>
                     </div>
 
-                    <div className="ml-auto flex items-center space-x-2">
+                    <div className="ms-auto flex items-center space-x-2">
                         <div className="relative flex items-center space-x-1">
                             <Button
                                 variant="ghost"
@@ -193,11 +197,12 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 className="group h-9 w-9 cursor-pointer"
                             >
                                 <Search className="!size-5 opacity-80 group-hover:opacity-100" />
+                                <span className="sr-only">Search</span>
                             </Button>
-                            <div className="ml-1 hidden gap-1 lg:flex">
+                            <div className="ms-1 hidden gap-1 lg:flex">
                                 {rightNavItems.map((item) => (
                                     <Tooltip key={item.title}>
-                                        <TooltipTrigger>
+                                        <TooltipTrigger asChild>
                                             <a
                                                 href={toUrl(item.href)}
                                                 target="_blank"
@@ -224,6 +229,7 @@ export function AppHeader({ breadcrumbs = [] }: Props) {
                                 <Button
                                     variant="ghost"
                                     className="size-10 rounded-full p-1"
+                                    aria-label="Open user menu"
                                 >
                                     <Avatar className="size-8 overflow-hidden rounded-full">
                                         <AvatarImage
