@@ -354,6 +354,19 @@ describe('nested resource routes', function () {
             ->and($this->child->fresh()->title)->toBe('c');
     });
 
+    it('does not reach children of another parent through this parent', function () {
+        $other = RelAuthParent::create(['title' => 'other']);
+        $foreign = $other->items()->create(['title' => 'foreign']);
+        $base = '/admin/relparents/'.$this->parent->id.'/nested-items';
+
+        $this->getJson($base.'/'.$foreign->id)->assertNotFound();
+        $this->putJson($base.'/'.$foreign->id, ['title' => 'x'])->assertNotFound();
+        $this->deleteJson($base.'/'.$foreign->id)->assertNotFound();
+        $this->postJson($base.'/bulk-delete', ['ids' => [$foreign->id]])->assertOk();
+
+        expect($foreign->fresh()->title)->toBe('foreign');
+    });
+
     it('does not restrict nested routes of models without policies', function () {
         $parent = RelOpenParent::create(['title' => 'p']);
         $child = $parent->items()->create(['title' => 'c']);

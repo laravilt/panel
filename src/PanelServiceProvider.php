@@ -560,7 +560,7 @@ class PanelServiceProvider extends ServiceProvider
                 $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
                 abort_unless($nestedResourceClass::canView($record), 403);
 
                 return response()->json([
@@ -575,7 +575,7 @@ class PanelServiceProvider extends ServiceProvider
                 $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
                 abort_unless($nestedResourceClass::canUpdate($record), 403);
                 $record->fill(request()->all());
                 $record->save();
@@ -593,7 +593,7 @@ class PanelServiceProvider extends ServiceProvider
                 $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
                 abort_unless($nestedResourceClass::canDelete($record), 403);
                 $record->delete();
 
@@ -615,11 +615,13 @@ class PanelServiceProvider extends ServiceProvider
                     return response()->json(['success' => false, 'message' => 'No records selected.'], 422);
                 }
 
-                foreach ($nestedModelClass::whereIn('id', $ids)->get() as $existing) {
+                $keyName = (new $nestedModelClass)->getQualifiedKeyName();
+
+                foreach ($this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->whereIn($keyName, $ids)->get() as $existing) {
                     abort_unless($nestedResourceClass::canDelete($existing), 403);
                 }
 
-                $nestedModelClass::whereIn('id', $ids)->delete();
+                $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->whereIn($keyName, $ids)->delete();
 
                 return response()->json([
                     'success' => true,
@@ -758,6 +760,26 @@ class PanelServiceProvider extends ServiceProvider
         }
 
         abort_unless(Gate::allows($ability, $subject), 403);
+    }
+
+    /**
+     * Query the child records of a nested resource through the parent record's relationship, so a
+     * child that belongs to another parent cannot be reached through this parent's URL.
+     *
+     * Falls back to an unscoped query when the parent model has no such relationship.
+     *
+     * @param  class-string<NestedResource>  $nestedResourceClass
+     * @param  class-string<Model>  $nestedModelClass
+     */
+    protected function nestedChildQuery(string $nestedResourceClass, string $nestedModelClass, Model $parentRecord): mixed
+    {
+        $childRelationship = $nestedResourceClass::getChildRelationship();
+
+        if (method_exists($parentRecord, $childRelationship)) {
+            return $parentRecord->{$childRelationship}();
+        }
+
+        return $nestedModelClass::query();
     }
 
     /**
