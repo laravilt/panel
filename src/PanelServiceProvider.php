@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Session\Middleware\AuthenticatesSessions;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Http\Middleware\HandlePrecognitiveRequests;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Routing\Router;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
@@ -464,13 +466,15 @@ class PanelServiceProvider extends ServiceProvider
                 $routeName = $routeNamePrefix.'.'.$pageName;
 
                 // Register the page route with parent record resolution
-                Route::get($fullPath, function (...$args) use ($pageClass, $nestedResourceClass, $parentSlug, $parentModelClass) {
+                Route::get($fullPath, function (...$args) use ($resourceClass, $pageClass, $nestedResourceClass, $parentSlug, $parentModelClass) {
                     // Get parent record ID from route
                     $parentId = request()->route($parentSlug);
 
                     // Resolve parent record
                     $parentRecord = $parentModelClass::findOrFail($parentId);
+                    $this->authorizeParentRecord($resourceClass, $parentRecord);
                     $nestedResourceClass::setParentRecord($parentRecord);
+                    abort_unless($nestedResourceClass::canViewAny(), 403);
 
                     // Create and boot the page
                     $page = app($pageClass);
@@ -492,10 +496,12 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Register data route for nested resource tables
-            Route::get($urlPrefix.'/data', function () use ($nestedResourceClass, $parentSlug, $parentModelClass) {
+            Route::get($urlPrefix.'/data', function () use ($resourceClass, $nestedResourceClass, $parentSlug, $parentModelClass) {
                 $parentId = request()->route($parentSlug);
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
+                abort_unless($nestedResourceClass::canViewAny(), 403);
 
                 $pages = $nestedResourceClass::getPages();
                 foreach ($pages as $pageConfig) {
@@ -513,10 +519,12 @@ class PanelServiceProvider extends ServiceProvider
 
             // Register CRUD routes for nested resources
             // POST - Create
-            Route::post($urlPrefix, function () use ($nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
+            Route::post($urlPrefix, function () use ($resourceClass, $nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
                 $parentId = request()->route($parentSlug);
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
+                abort_unless($nestedResourceClass::canCreate(), 403);
 
                 $data = request()->all();
                 $record = new $nestedModelClass;
@@ -547,11 +555,13 @@ class PanelServiceProvider extends ServiceProvider
             })->name($routeNamePrefix.'.store');
 
             // GET - Show single record
-            Route::get($urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+            Route::get($urlPrefix.'/{id}', function ($parentId, $id) use ($resourceClass, $nestedResourceClass, $nestedModelClass, $parentModelClass) {
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
+                abort_unless($nestedResourceClass::canView($record), 403);
 
                 return response()->json([
                     'success' => true,
@@ -560,11 +570,13 @@ class PanelServiceProvider extends ServiceProvider
             })->name($routeNamePrefix.'.show')->where('id', '[0-9]+');
 
             // PUT/PATCH - Update
-            Route::match(['put', 'patch'], $urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+            Route::match(['put', 'patch'], $urlPrefix.'/{id}', function ($parentId, $id) use ($resourceClass, $nestedResourceClass, $nestedModelClass, $parentModelClass) {
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
+                abort_unless($nestedResourceClass::canUpdate($record), 403);
                 $record->fill(request()->all());
                 $record->save();
 
@@ -576,11 +588,13 @@ class PanelServiceProvider extends ServiceProvider
             })->name($routeNamePrefix.'.update')->where('id', '[0-9]+');
 
             // DELETE - Destroy
-            Route::delete($urlPrefix.'/{id}', function ($parentId, $id) use ($nestedResourceClass, $nestedModelClass, $parentModelClass) {
+            Route::delete($urlPrefix.'/{id}', function ($parentId, $id) use ($resourceClass, $nestedResourceClass, $nestedModelClass, $parentModelClass) {
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
-                $record = $nestedModelClass::findOrFail($id);
+                $record = $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->findOrFail($id);
+                abort_unless($nestedResourceClass::canDelete($record), 403);
                 $record->delete();
 
                 return response()->json([
@@ -590,9 +604,10 @@ class PanelServiceProvider extends ServiceProvider
             })->name($routeNamePrefix.'.destroy')->where('id', '[0-9]+');
 
             // Bulk delete
-            Route::post($urlPrefix.'/bulk-delete', function () use ($nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
+            Route::post($urlPrefix.'/bulk-delete', function () use ($resourceClass, $nestedResourceClass, $nestedModelClass, $parentSlug, $parentModelClass) {
                 $parentId = request()->route($parentSlug);
                 $parentRecord = $parentModelClass::findOrFail($parentId);
+                $this->authorizeParentRecord($resourceClass, $parentRecord);
                 $nestedResourceClass::setParentRecord($parentRecord);
 
                 $ids = request()->input('ids', []);
@@ -600,7 +615,13 @@ class PanelServiceProvider extends ServiceProvider
                     return response()->json(['success' => false, 'message' => 'No records selected.'], 422);
                 }
 
-                $nestedModelClass::whereIn('id', $ids)->delete();
+                $keyName = (new $nestedModelClass)->getQualifiedKeyName();
+
+                foreach ($this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->whereIn($keyName, $ids)->get() as $existing) {
+                    abort_unless($nestedResourceClass::canDelete($existing), 403);
+                }
+
+                $this->nestedChildQuery($nestedResourceClass, $nestedModelClass, $parentRecord)->whereIn($keyName, $ids)->delete();
 
                 return response()->json([
                     'success' => true,
@@ -727,11 +748,60 @@ class PanelServiceProvider extends ServiceProvider
     }
 
     /**
+     * Abort with 403 unless the related model's policy allows the ability.
+     *
+     * Models without a registered policy are not restricted, so existing apps keep working.
+     * Class level abilities (viewAny, create) take the model class, record level ones the record.
+     */
+    protected function authorizeRelatedModel(string $ability, string|Model $subject): void
+    {
+        if (Gate::getPolicyFor($subject) === null) {
+            return;
+        }
+
+        abort_unless(Gate::allows($ability, $subject), 403);
+    }
+
+    /**
+     * Query the child records of a nested resource through the parent record's relationship, so a
+     * child that belongs to another parent cannot be reached through this parent's URL.
+     *
+     * Falls back to an unscoped query when the parent model has no such relationship.
+     *
+     * @param  class-string<NestedResource>  $nestedResourceClass
+     * @param  class-string<Model>  $nestedModelClass
+     */
+    protected function nestedChildQuery(string $nestedResourceClass, string $nestedModelClass, Model $parentRecord): mixed
+    {
+        $childRelationship = $nestedResourceClass::getChildRelationship();
+
+        if (method_exists($parentRecord, $childRelationship)) {
+            return $parentRecord->{$childRelationship}();
+        }
+
+        return $nestedModelClass::query();
+    }
+
+    /**
+     * Abort with 403 unless the current user may view the parent (owner) record of a relation manager
+     * or nested resource.
+     *
+     * @param  class-string  $resourceClass
+     */
+    protected function authorizeParentRecord(string $resourceClass, Model $parentRecord): void
+    {
+        abort_unless($resourceClass::canView($parentRecord), 403);
+    }
+
+    /**
      * Register route for reordering records (used by tables with ->reorderable())
      */
     protected function registerReorderRoute(string $resourceClass, string $slug, string $modelClass, Panel $panel): void
     {
-        Route::post($slug.'/reorder', function () use ($modelClass) {
+        Route::post($slug.'/reorder', function () use ($resourceClass, $modelClass) {
+            // Reordering needs the resource's reorder ability (falls back to the policy's update)
+            abort_unless($resourceClass::canReorder(), 403);
+
             $items = request()->input('items', []);
             $column = request()->input('column', 'sort_order');
 
@@ -787,6 +857,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $relationship = request()->route('relationship');
             $record = $modelClass::findOrFail($id);
+            $this->authorizeParentRecord($resourceClass, $record);
 
             // Find the relation manager class
             $relationManagers = $resourceClass::getRelations();
@@ -805,6 +876,7 @@ class PanelServiceProvider extends ServiceProvider
 
             // Get the relationship query
             $relationQuery = $record->{$relationship}();
+            $this->authorizeRelatedModel('viewAny', $relationQuery->getRelated()::class);
 
             // Apply pagination
             $perPage = request('per_page', 10);
@@ -840,6 +912,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $relationship = request()->route('relationship');
             $record = $modelClass::findOrFail($id);
+            $this->authorizeParentRecord($resourceClass, $record);
 
             // Find the relation manager class
             $relationManagers = $resourceClass::getRelations();
@@ -861,6 +934,8 @@ class PanelServiceProvider extends ServiceProvider
             }
 
             // Get the relationship and create the new record
+            $this->authorizeRelatedModel('create', $record->{$relationship}()->getRelated()::class);
+
             $data = request()->all();
             $newRecord = $record->{$relationship}()->create($data);
 
@@ -888,6 +963,7 @@ class PanelServiceProvider extends ServiceProvider
             $relationship = request()->route('relationship');
             $relationId = request()->route('relationId');
             $record = $modelClass::findOrFail($id);
+            $this->authorizeParentRecord($resourceClass, $record);
 
             // Find the relation manager class
             $relationManagers = $resourceClass::getRelations();
@@ -910,6 +986,7 @@ class PanelServiceProvider extends ServiceProvider
 
             // Find and update the related record
             $relatedRecord = $record->{$relationship}()->findOrFail($relationId);
+            $this->authorizeRelatedModel('update', $relatedRecord);
             $relatedRecord->update(request()->all());
 
             // Send success notification
@@ -936,6 +1013,7 @@ class PanelServiceProvider extends ServiceProvider
             $relationship = request()->route('relationship');
             $relationId = request()->route('relationId');
             $record = $modelClass::findOrFail($id);
+            $this->authorizeParentRecord($resourceClass, $record);
 
             // Find the relation manager class
             $relationManagers = $resourceClass::getRelations();
@@ -958,6 +1036,7 @@ class PanelServiceProvider extends ServiceProvider
 
             // Find and delete the related record
             $relatedRecord = $record->{$relationship}()->findOrFail($relationId);
+            $this->authorizeRelatedModel('delete', $relatedRecord);
             $relatedRecord->delete();
 
             // Send success notification
@@ -982,6 +1061,7 @@ class PanelServiceProvider extends ServiceProvider
             $id = request()->route('id');
             $relationship = request()->route('relationship');
             $record = $modelClass::findOrFail($id);
+            $this->authorizeParentRecord($resourceClass, $record);
 
             // Find the relation manager class
             $relationManagers = $resourceClass::getRelations();
@@ -1010,6 +1090,11 @@ class PanelServiceProvider extends ServiceProvider
                 }
 
                 return back()->withErrors(['error' => 'No records selected']);
+            }
+
+            // Every selected related record must be deletable
+            foreach ($record->{$relationship}()->whereIn('id', $ids)->get() as $relatedRecord) {
+                $this->authorizeRelatedModel('delete', $relatedRecord);
             }
 
             // Delete the related records
