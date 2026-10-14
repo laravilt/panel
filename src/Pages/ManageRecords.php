@@ -21,6 +21,7 @@ use Laravilt\Infolists\Infolist;
 use Laravilt\Notifications\Notification;
 use Laravilt\Schemas\Schema;
 use Laravilt\Tables\Table;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * ManageRecords page for simple resources.
@@ -502,6 +503,12 @@ abstract class ManageRecords extends ListRecords
                         abort(403, __('actions::actions.errors.unauthorized'));
                     }
 
+                    foreach ($modelClass::whereIn('id', $ids)->get() as $existing) {
+                        if (! $resource::canDelete($existing)) {
+                            abort(403, __('actions::actions.errors.unauthorized'));
+                        }
+                    }
+
                     $deleted = $modelClass::whereIn('id', $ids)->delete();
 
                     Notification::success()
@@ -532,6 +539,12 @@ abstract class ManageRecords extends ListRecords
                         abort(403, __('actions::actions.errors.unauthorized'));
                     }
 
+                    foreach ($modelClass::withTrashed()->whereIn('id', $ids)->get() as $existing) {
+                        if (! $resource::canRestore($existing)) {
+                            abort(403, __('actions::actions.errors.unauthorized'));
+                        }
+                    }
+
                     $restored = $modelClass::withTrashed()->whereIn('id', $ids)->restore();
 
                     Notification::success()
@@ -557,6 +570,12 @@ abstract class ManageRecords extends ListRecords
                     // Authorize: check if user can force delete
                     if (! $resource::canForceDelete()) {
                         abort(403, __('actions::actions.errors.unauthorized'));
+                    }
+
+                    foreach ($modelClass::withTrashed()->whereIn('id', $ids)->get() as $existing) {
+                        if (! $resource::canForceDelete($existing)) {
+                            abort(403, __('actions::actions.errors.unauthorized'));
+                        }
                     }
 
                     $deleted = $modelClass::withTrashed()->whereIn('id', $ids)->forceDelete();
@@ -650,6 +669,10 @@ abstract class ManageRecords extends ListRecords
     {
         $resource = static::getResource();
 
+        if ($resource && ! $resource::canViewAny()) {
+            abort(403);
+        }
+
         // Configure the table with modal CRUD actions
         $table = new Table;
         $table = $resource::table($table);
@@ -682,6 +705,10 @@ abstract class ManageRecords extends ListRecords
         $resource = static::getResource();
         $modelClass = $resource::getModel();
 
+        if (! $resource::canCreate()) {
+            abort(403);
+        }
+
         try {
             $data = $request->all();
             $record = new $modelClass;
@@ -712,6 +739,10 @@ abstract class ManageRecords extends ListRecords
         try {
             $record = $modelClass::findOrFail($id);
 
+            if (! $resource::canView($record)) {
+                abort(403);
+            }
+
             // Load relationship data for the form
             $recordData = $record->toArray();
             $recordData = $this->loadRelationshipDataForRecord($record, $recordData);
@@ -720,6 +751,8 @@ abstract class ManageRecords extends ListRecords
                 'success' => true,
                 'record' => $recordData,
             ]);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -801,6 +834,10 @@ abstract class ManageRecords extends ListRecords
         try {
             $record = $modelClass::findOrFail($id);
 
+            if (! $resource::canView($record)) {
+                abort(403);
+            }
+
             // Boot and mount the page
             $this->boot();
             $this->mount();
@@ -818,6 +855,8 @@ abstract class ManageRecords extends ListRecords
             $props['autoOpenModal'] = 'view'; // or 'edit' based on user preference
 
             return Inertia::render($this->getView(), $props);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (ModelNotFoundException $e) {
             // Record not found - redirect to index with error notification
             Notification::danger()
@@ -848,6 +887,11 @@ abstract class ManageRecords extends ListRecords
 
         try {
             $record = $modelClass::findOrFail($id);
+
+            if (! $resource::canUpdate($record)) {
+                abort(403);
+            }
+
             $data = $request->all();
             $record->fill($data);
             $record->save();
@@ -857,6 +901,8 @@ abstract class ManageRecords extends ListRecords
                 'message' => __('actions::actions.messages.saved'),
                 'record' => $record,
             ]);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -875,12 +921,19 @@ abstract class ManageRecords extends ListRecords
 
         try {
             $record = $modelClass::findOrFail($id);
+
+            if (! $resource::canDelete($record)) {
+                abort(403);
+            }
+
             $record->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => __('actions::actions.messages.deleted'),
             ]);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -907,12 +960,21 @@ abstract class ManageRecords extends ListRecords
                 ], 422);
             }
 
+            // Authorize: deleteAny plus delete on every selected record
+            $records = $modelClass::whereIn('id', $ids)->get();
+
+            if (! $resource::canDelete() || $records->contains(fn ($record) => ! $resource::canDelete($record))) {
+                abort(403);
+            }
+
             $modelClass::whereIn('id', $ids)->delete();
 
             return response()->json([
                 'success' => true,
                 'message' => __('actions::actions.messages.bulk_deleted', ['count' => count($ids)]),
             ]);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

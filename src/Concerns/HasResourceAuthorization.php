@@ -109,6 +109,73 @@ trait HasResourceAuthorization
     }
 
     /**
+     * Map a permission action (e.g. "view_any", "force_delete") to a policy ability ("viewAny", "forceDelete").
+     */
+    protected static function getPolicyAbility(string $action): string
+    {
+        return str($action)->camel()->toString();
+    }
+
+    /**
+     * Check an action against the model's Laravel policy.
+     *
+     * Returns null when the model has no registered policy, so callers can fall back to the
+     * permission based checks. When a policy exists its answer is final.
+     *
+     * Record level abilities checked without a record (e.g. bulk actions, buttons) use the
+     * policy's "{ability}Any" method (deleteAny, restoreAny, ...) when it exists, otherwise the
+     * ability is evaluated against an empty model instance.
+     */
+    protected static function checkPolicy(string $action, ?Model $record, mixed $user): ?bool
+    {
+        $modelClass = static::getModel();
+
+        if (! class_exists($modelClass)) {
+            return null;
+        }
+
+        $policy = Gate::getPolicyFor($record ?? $modelClass);
+
+        if ($policy === null) {
+            return null;
+        }
+
+        $ability = static::getPolicyAbility($action);
+
+        // Laravel's generated policies do not define replicate/reorder; fall back to create/update
+        if (! method_exists($policy, $ability)) {
+            $ability = match ($ability) {
+                'replicate' => 'create',
+                'reorder' => 'update',
+                default => $ability,
+            };
+        }
+
+        $gate = Gate::forUser($user);
+
+        // Class level abilities
+        if (in_array($ability, ['viewAny', 'create'], true)) {
+            return $gate->allows($ability, $modelClass);
+        }
+
+        if ($record) {
+            return $gate->allows($ability, $record);
+        }
+
+        $anyAbility = $ability.'Any';
+
+        if (method_exists($policy, $anyAbility)) {
+            return $gate->allows($anyAbility, $modelClass);
+        }
+
+        try {
+            return $gate->allows($ability, new $modelClass);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Check if a user has a specific permission for this resource.
      */
     protected static function userCan(string $action, ?Model $record = null): bool
@@ -133,6 +200,14 @@ trait HasResourceAuthorization
             } catch (\Exception $e) {
                 // Spatie Permission not installed or role doesn't exist
             }
+        }
+
+        // Respect the model's Laravel policy when one is registered (Filament semantics).
+        // A policy, when present, is the source of truth for the ability.
+        $policyResult = static::checkPolicy($action, $record, $user);
+
+        if ($policyResult !== null) {
+            return $policyResult;
         }
 
         // Use policy-based authorization if enabled
